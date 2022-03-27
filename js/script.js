@@ -1093,7 +1093,7 @@ function getCookie(name) {
 };
 
 function checkCookie(name) {
-    let save = getCookie();
+    let save = getCookie(name);
     if ((save || {}) != {}) {
         load(save);
         return true;
