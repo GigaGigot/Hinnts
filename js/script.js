@@ -1108,7 +1108,6 @@ function load(save) {
     if (save.highestScore !== undefined) {
         Data.highestScore = save.highestScore;
     }
-    console.log(Data.highestScore);
     if (save.volume !== undefined) {
         Data.volume = save.volume;
     }
