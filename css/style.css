@@ -1,0 +1,22 @@
+body {
+    background: #383838 url(../img/bg2.png) no-repeat fixed;
+    background-size: 100%;
+}
+
+#main {
+    padding: 0;
+    margin: auto;
+    display: block;
+    width: 800px;
+    height: 600px;
+    position: absolute;
+    border: 16px solid transparent;
+	-moz-border-image:url(../img/border.png) 32 32 round; /* Old Firefox */
+	-webkit-border-image:url(../img/border.png) 32 32 round; /* Safari */
+	-o-border-image:url(../img/border.png) 32 32 round; /* Opera */
+	border-image:url(../img/border.png) 32 32 round;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
