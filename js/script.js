@@ -1,4 +1,5 @@
 // constantes
+let MAIN_COOKIE = "saveHinnts";
 let WIDTH = 800;
 let HEIGHT = 600;
 let FONT = "Verdana";
@@ -20,7 +21,7 @@ let currentScore, lastScore;
 
 
 function startGame() {
-	checkCookie();
+	checkCookie(MAIN_COOKIE);
 	saveCookie();
     Game.start();
     changeState("Chargement");
@@ -1080,17 +1081,18 @@ function setCookie(cname, cvalue, exdays) {
     document.cookie = cname + "=" + cvalue + "; " + expires;
 };
 
-function getCookie() {
+function getCookie(name) {
+    let nameEQ = name + "=";
     let cookie = document.cookie.split(';');
     if (cookie[0]) {
-        return JSON.parse(cookie[0]);
+        return JSON.parse(cookie[0].replace(nameEQ, ""));
     }
     else {
         return {};
     }
 };
 
-function checkCookie() {
+function checkCookie(name) {
     let save = getCookie();
     if ((save || {}) != {}) {
         load(save);
@@ -1101,7 +1103,7 @@ function checkCookie() {
 };
 
 function saveCookie() {
-    setCookie("saveHinnts", JSON.stringify(Data), 365);
+    setCookie(MAIN_COOKIE, JSON.stringify(Data), 365);
 };
 
 function load(save) {
