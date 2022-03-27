@@ -1083,7 +1083,7 @@ function setCookie(cname, cvalue, exdays) {
 function getCookie() {
     let cookie = document.cookie.split(';');
     if (cookie[0]) {
-        return JSON.parse(unescape(cookie[0]));
+        return JSON.parse(cookie[0]);
     }
     else {
         return {};
