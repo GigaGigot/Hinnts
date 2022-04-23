@@ -2,11 +2,8 @@
 let MAIN_COOKIE = "saveHinnts";
 let WIDTH = 800;
 let HEIGHT = 600;
-let FONT = "Verdana";
-let KEY_SKILL_1 = 65;
-let KEY_SKILL_2 = 90;
-let KEY_SKILL_3 = 69; //Nice
-let KEY_SKILL_4 = 82;
+let FONT = "Papyrus";
+let KEY_SKILL_1, KEY_SKILL_2, KEY_SKILL_3, KEY_SKILL_4;
 
 // Common content
 let images = {
@@ -16,20 +13,23 @@ let images = {
 };
 let images3States = {};
 let titre, pluie, eclair, nuage1, brume1, nuage2, brume2;
+let audios = [];
 let scrolledUp, scrolledDown;
-let currentScore, lastScore;
+let currentScore;
 
 
 function startGame() {
 	checkCookie(MAIN_COOKIE);
 	saveCookie();
+    Game.setSkillsKeys();
     Game.start();
     changeState("Chargement");
 };
 
 let Data = {
     highestScore: null,
-    volume: 0.5
+    volume: 0.5,
+    keyboard: "AZERTY"
 }
 
 let Game = {
@@ -44,9 +44,7 @@ let Game = {
 
         // init
         window.addEventListener('click', function(e) {
-            this.music = new Audio("./sound/soundtrack.wav");
-            this.music.volume = 0.1 * Data.volume;
-            this.music.loop = true;
+            this.music = new Sound("./sound/soundtrack.wav", true);
             this.music.play();
         }, {once: true});
 
@@ -119,6 +117,29 @@ let Game = {
     },
     stop: function () {
         clearInterval(this.interval);
+    },
+    setSkillsKeys: function () {
+        switch (Data.keyboard) {
+            case "AZERTY":
+                KEY_SKILL_1 = 65;
+                KEY_SKILL_2 = 90;
+                KEY_SKILL_3 = 69; //Nice
+                KEY_SKILL_4 = 82;
+                break;
+            case "QWERTY":
+                KEY_SKILL_1 = 81;
+                KEY_SKILL_2 = 87;
+                KEY_SKILL_3 = 69; //Nice
+                KEY_SKILL_4 = 82;
+                break;
+        }
+    },
+	setSoundVolume: function() {
+        audios.forEach(audio => audio.sound.volume = 0.1 * Data.volume);
+	},
+    clearMouseUp: function() {
+        Game.xMouseUp = null;
+		Game.yMouseUp = null;
     }
 };
 
@@ -247,7 +268,7 @@ function Defender(width, height, sprite) {
     }
 };
 
-function Attacker(width, height, image, x, y, xSpeed, ySpeed, flip) {
+function Attacker(width, height, image, x, y, xSpeed, ySpeed, flip, life) {
     this.width = width;
     this.height = height;
     this.x = x - width / 2;
@@ -259,12 +280,12 @@ function Attacker(width, height, image, x, y, xSpeed, ySpeed, flip) {
     this.ySpeed = ySpeed;
     this.dead = false;
     this.ERROR_IN_LIFE = false;
-    this.life = rand(1, 5 + Math.pow(Game.frameNo, 1.2) / 1000);
-    this.lifeDsp = new Text("16px", FONT, "white", x, y - 2, String(this.life));
+    this.life = life;
+    this.lifeDsp = new Text("16px", FONT, "white", x + TextWidth(String(this.life)), y - 2, String(this.life));
     this.sprite = new SpriteAnimated(x, y, width, height, image, flip, 5);
     this.update = function () {
 		if (this.dead == false) {
-			this.lifeDsp.newPos(this.x, this.y - 2);
+			this.lifeDsp.newPos(this.x + TextWidth(String(this.life)), this.y - 2);
 			this.lifeDsp.update();
 		}
         this.sprite.update();
@@ -492,7 +513,9 @@ function Button(x, y, width, height, image3States, imageTxt) {
     this.height = height;
     this.image3States = image3States;
     this.fond = new Background(x, y, width, height, this.image3States.normal, "image");
-    this.texte = new Background(x, y, width, height, imageTxt, "image");
+    if (imageTxt != null) {
+        this.texte = new Background(x, y, width, height, imageTxt, "image");
+    }
 	this.focused = false;
 	this.clickedDown = false;
 	this.clickedUp = false;
@@ -500,7 +523,9 @@ function Button(x, y, width, height, image3States, imageTxt) {
 		this.checkEvent();
 		this.changeEvent();
         this.fond.update();
-        this.texte.update();
+        if (this.texte !== undefined) {
+            this.texte.update();
+        }
     }
 	this.checkEvent = function () {
 		if (Game.xMouseMove >= this.x && Game.xMouseMove <= this.x + this.width && Game.yMouseMove >= this.y && Game.yMouseMove <= this.y + this.height) {
@@ -536,6 +561,15 @@ function Button(x, y, width, height, image3States, imageTxt) {
 			this.fond.image = this.image3States.clicked;
 		}
 	}
+    this.isClicked = function() {
+        if (this.clickedUp) {
+            Game.clearMouseUp()
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
 };
 
 function Background(x, y, width, height, texture, type) {
@@ -606,7 +640,7 @@ function LifeBar(x, y, width, height, maxHP) {
     this.contour = new Background(x - 3, y, width + 6, height + 2, images.contourVie, "image");
     this.fond = new Background(x, y + 3, width, height - 4, images.fondVie, "image");
     this.vie = new Background(x, y + 3, width, height - 4, images.vie, "image");
-    this.dspVie = new Text("14px", FONT, "white", x + 135, y + 14, String(this.vie));
+    this.dspVie = new Text("14px", FONT, "white", x + 135, y + 13, String(this.vie));
     this.maxHP = maxHP;
     this.currHP = maxHP;
     this.update = function () {
@@ -615,6 +649,7 @@ function LifeBar(x, y, width, height, maxHP) {
         this.vie.width = (this.currHP * this.fond.width) / 100;
         this.vie.update();
         this.dspVie.text = this.currHP;
+        this.dspVie.x = this.fond.x + (this.fond.width / 2) - (TextWidth(this.dspVie.text) / 2);
         this.dspVie.update();
     }
 };
@@ -688,29 +723,29 @@ function BarSlider(x, y, width, height) {
 	this.afficherTexte = function () {
 		this.dspMin.update();
 		this.dspMax.update();
-		this.dspCurrent.x = this.bitogno.x + 2;
 		this.dspCurrent.text = Math.round(((this.bitogno.x + this.bitogno.width / 2 - this.x) / this.width) * this.max);
+		this.dspCurrent.x = this.bitogno.x + (this.bitogno.width / 2) - (TextWidth(this.dspCurrent.text) / 2);
 		this.dspCurrent.update();
 	}
 };
 
-function Sound(src) {
+function Sound(src, looping) {
     this.sound = document.createElement("audio");
     this.sound.src = src;
-    this.sound.volume = 0.5;
+    this.sound.loop = looping;
     this.sound.setAttribute("preload", "auto");
     this.sound.setAttribute("controls", "none");
     this.sound.style.display = "none";
     document.body.appendChild(this.sound);
+    audios.push(this);
+    Game.setSoundVolume();
+
     this.play = function () {
         this.sound.play();
     }
     this.stop = function () {
         this.sound.pause();
     }
-	this.setSoundVolume = function(x) {
-		this.sound.volume = x;
-	}
 }
 
 /* Fonctions boucle */
@@ -729,6 +764,11 @@ function lancerChargement() {
     };
 
     function buildCanvas() {
+        let fontSource = new FontFace(FONT, "url(font/PAPYRUS.TTF)");
+        fontSource.load().then(function(font){
+            document.fonts.add(font);
+        });
+
         let sources = {
             titre: "./img/titre.png",
             pluie: "./img/pluie.png",
@@ -750,6 +790,11 @@ function lancerChargement() {
             jouer: "./img/jouer.png",
             options: "./img/options.png",
             retour: "./img/retour.png",
+            menu: "./img/menu.png",
+            rejouer: "./img/rejouer.png",
+            new1: "./img/new1.png",
+            new2: "./img/new2.png",
+            dieded: "./img/dieded.png",
             tour: "./img/tour.png",
             tour_ombre : "./img/tour_ombre.png",
             sprite_feu: "./img/sprite_feu.png",
@@ -766,6 +811,12 @@ function lancerChargement() {
             diviseParCent : "./img/diviseParCent.png",
             diviseParMille : "./img/diviseParMille.png",
             racineCarree : "./img/racineCarree.png",
+            fleche_gauche : "./img/fleche_gauche.png",
+            fleche_gauche_clic : "./img/fleche_gauche_clic.png",
+            fleche_gauche_focus : "./img/fleche_gauche_focus.png",
+            fleche_droite : "./img/fleche_droite.png",
+            fleche_droite_clic : "./img/fleche_droite_clic.png",
+            fleche_droite_focus : "./img/fleche_droite_focus.png",
         };
         let loadedImages = 0;
         let numImages = 0;
@@ -801,10 +852,10 @@ function lancerMenu() {
         // Game
         Game.update();
 
-        if (btnJouer.clickedUp) {
+        if (btnJouer.isClicked()) {
             changeState("Jouer");
         }
-        if (btnOptions.clickedUp) {
+        if (btnOptions.isClicked()) {
             changeState("Options");
         }
 
@@ -836,7 +887,15 @@ function lancerMenu() {
 function lancerOptions() {
     let bg = new Background(0, 0, 800, 600, images.mainBg, "image");
     let btnRetour = new Button(Game.canvas.width / 2 - 128, 500, 256, 64, images3States.boutonFond, images.retour);
-    let barslider = new BarSlider(300, 300, 100, 16);
+    let volumeDsp = new Text("16px", FONT, "white", 270, 312, `Volume :`);
+    let barslider = new BarSlider(410, 300, 100, 16);
+    let keyboardDsp = new Text("16px", FONT, "white", 270, 362, `Keyboard :`);
+    let btnFlecheGauche = new Button(370, 342, 32, 32, images3States.fleche_gauche, null);
+    let btnFlecheDroite = new Button(530, 342, 32, 32, images3States.fleche_droite, null);
+    let keyboards = ["AZERTY", "QWERTY"];
+    let currentKeyboardsIndex = keyboards.indexOf(Data.keyboard);
+    let currentKeyboardDsp = new Text("16px", FONT, "white", 466, 362, String(`${keyboards[currentKeyboardsIndex]}`));
+    currentKeyboardDsp.x = 466 - (TextWidth(currentKeyboardDsp.text) / 2);
 
     Game.interval = setInterval(update, 20);
 
@@ -844,8 +903,23 @@ function lancerOptions() {
         // Game
         Game.update();
 
-        if (btnRetour.clickedUp) {
+        if (btnRetour.isClicked()) {
+            Data.keyboard = keyboards[currentKeyboardsIndex];
+            Game.setSkillsKeys();
+            saveCookie();
             changeState("Menu");
+        }
+
+        if (btnFlecheGauche.isClicked()) {
+            if (currentKeyboardsIndex != 0) {
+                currentKeyboardsIndex--;
+            }
+        }
+
+        if (btnFlecheDroite.isClicked()) {
+            if (currentKeyboardsIndex != keyboards.length - 1) {
+                currentKeyboardsIndex++;
+            }
         }
 
         bg.update();
@@ -864,13 +938,22 @@ function lancerOptions() {
 
         titre.update();
         btnRetour.update();
+        btnFlecheGauche.update();
+        btnFlecheDroite.update();
+        currentKeyboardDsp.text = String(`${keyboards[currentKeyboardsIndex]}`);
+        currentKeyboardDsp.x = 466 - (TextWidth(currentKeyboardDsp.text) / 2);
+        currentKeyboardDsp.update();
+
+        volumeDsp.update();
         barslider.update();
+        keyboardDsp.update();
 
 		brume1.update();
 		brume2.update();
 
 		Cursor.update();
-		Game.music.setSoundVolume(parseInt(barslider.dspCurrent.text) / 10);
+        Data.volume = parseInt(barslider.dspCurrent.text) / 10;
+        Game.setSoundVolume();
     };
 };
 
@@ -886,6 +969,9 @@ function lancerJouer() {
     let bg = new Background(0, 0, 800, 600, images.mainBg, "image");
     let eclairRouge = new Background(0, 0, WIDTH, HEIGHT, images.eclairRouge, "image");
     let doEclairRouge = false;
+    let currentSpawn = 0;
+    let nextSpawn = 100;
+    let isPerdu = false;
 
     Game.interval = setInterval(update, 20);
 
@@ -910,7 +996,17 @@ function lancerJouer() {
         }
 
         // Attackers
-        if (everyInterval(150)) {
+        currentSpawn += 1;
+        if (currentSpawn == nextSpawn) {
+            let minLife = 1;
+            let maxLife = Math.round(5 + Math.pow(Game.frameNo, 1.2) / 250);
+            let tmpLife = rand(minLife, maxLife);
+            let adjustementPercentage = (tmpLife - maxLife) / maxLife;
+            currentSpawn = 0;
+            let nextSpawnFormula = Math.pow(Game.frameNo, 1.2) / 500;
+            nextSpawn += Math.round(nextSpawnFormula + nextSpawnFormula * adjustementPercentage);
+            //console.log(`minLife=${minLife}, maxLife=${maxLife}, tmpLife=${tmpLife}, adjustementPercentage=${adjustementPercentage}, nextSpawnFormula=${nextSpawnFormula}, nextSpawn=${nextSpawn}`);
+
             let r = Math.round(Math.random());
             let xRand = (r == 0) ? 0 : Game.canvas.width;
             let yRand = rand(0, Game.canvas.height);
@@ -918,7 +1014,7 @@ function lancerJouer() {
             let dy = (def.yCenter - yRand);
             let mag = Math.sqrt(dx * dx + dy * dy);
 
-            attackers.push(new Attacker(32, 32, images.sprite_feu, xRand, yRand, (dx / mag), (dy / mag), r));
+            attackers.push(new Attacker(32, 32, images.sprite_feu, xRand, yRand, (dx / mag), (dy / mag), r, tmpLife));
         }
 
         // collide
@@ -951,8 +1047,9 @@ function lancerJouer() {
 			}
 		}
 
-        if (def.life.currHP == 0) {
-            changeState("Menu");
+        if (def.life.currHP == 0 && !isPerdu) {
+            isPerdu = true;
+            changeState("Perdu");
         }
 
         // update
@@ -1003,6 +1100,87 @@ function lancerJouer() {
     };
 };
 
+function lancerPerdu() {
+    let bg = new Background(0, 0, 800, 600, images.mainBg, "image");
+    let eclairRouge = new Background(0, 0, WIDTH, HEIGHT, images.eclairRouge, "image");
+    let btnRejouer = new Button(Game.canvas.width / 2 - 128, 400, 256, 64, images3States.boutonFond, images.rejouer);
+    let btnMenu = new Button(Game.canvas.width / 2 - 128, 500, 256, 64, images3States.boutonFond, images.menu);
+    let diededTitre = new Background(0, 0, 800, 300, images.dieded, "image");
+    let xText = 300;
+    let finalScoreDsp = new Text("24px", FONT, "white", xText, 250, `Final score : ${(currentScore == undefined ? 'none' : String(currentScore))}`);
+    let previousHighscore = Data.highestScore;
+    let previousHighscoreDsp = new Text("24px", FONT, "white", xText, 350, `(previous : ${(previousHighscore == undefined ? 'none' : previousHighscore)})`);
+
+    let isNewHighscore = false;
+    if (currentScore != undefined) {
+        if (Data.highestScore == undefined || currentScore > Data.highestScore) {
+            isNewHighscore = true;
+            Data.highestScore = currentScore;
+            saveCookie();
+        }
+    }
+
+    let highscoreDsp = new Text("24px", FONT, "white", xText, 300, `Highscore : ${(Data.highestScore == undefined ? 'none' : String(Data.highestScore))}`);
+    let new1 = new Background(xText + 160, 275, 128, 32, images.new1, "image");
+    let new2 = new Background(xText + 160, 275, 128, 32, images.new2, "image");
+
+    Game.interval = setInterval(update, 40);
+
+    function update() {
+        // Game
+        Game.update();
+
+        if (btnRejouer.isClicked()) {
+            changeState("Jouer");
+        }
+        if (btnMenu.isClicked()) {
+            changeState("Menu");
+        }
+
+        bg.update();
+		if (eclair.time != 0 && eclair.time != undefined) {
+			eclair.update();
+			eclair.time--;
+		}
+		else if (rand(0, 100) == 1) {
+			eclair.time = rand(4, 8)
+			eclair.update();
+		}
+
+        eclairRouge.update();
+
+        pluie.update();
+		nuage1.update();
+		nuage2.update();
+
+        diededTitre.update();
+        btnRejouer.update();
+        btnMenu.update();
+
+        finalScoreDsp.update();
+        highscoreDsp.update();
+
+        if (isNewHighscore) {
+            previousHighscoreDsp.update();
+            new1.update();
+            if (new2.time != 0 && new2.time != undefined) {
+                new2.time--;
+                if (new2.time < 20) {
+                    new2.update();
+                }
+            }
+            else {
+                new2.time = 40;
+            }
+        }
+
+		brume1.update();
+		brume2.update();
+
+		Cursor.update();
+    };
+};
+
 function loadGlobalVariables() {
     titre = new Background(150, 0, 500, 300, images.titre, "image");
     pluie = new Background(0, 0, WIDTH, HEIGHT, images.pluie, "image");
@@ -1022,6 +1200,18 @@ function loadGlobalVariables() {
         clicked: images.boutonFond_clic,
         focused: images.boutonFond_focus
     };
+
+    images3States.fleche_gauche = {
+        normal: images.fleche_gauche,
+        clicked: images.fleche_gauche_clic,
+        focused: images.fleche_gauche_focus
+    };
+
+    images3States.fleche_droite = {
+        normal: images.fleche_droite,
+        clicked: images.fleche_droite_clic,
+        focused: images.fleche_droite_focus
+    };
 }
 ///////////////////////
 
@@ -1036,7 +1226,7 @@ function changeState(newState) {
         lancerJouer();
     }
     else if (newState == "Perdu") {
-        //lancerPerdu();
+        lancerPerdu();
     }
     else if (newState == "Menu") {
         lancerMenu();
@@ -1069,6 +1259,10 @@ function NewImage(url) {
     let img = new Image();
     img.src = url;
     return img;
+}
+
+function TextWidth(txt) {
+    return Game.context.measureText(txt).width;
 }
 ///////////////////////
 
@@ -1112,6 +1306,9 @@ function load(save) {
     }
     if (save.volume !== undefined) {
         Data.volume = save.volume;
+    }
+    if (save.keyboard !== undefined) {
+        Data.keyboard = save.keyboard;
     }
 };
 ///////////////////////
