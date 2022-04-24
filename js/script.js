@@ -727,6 +727,18 @@ function BarSlider(x, y, width, height) {
 		this.dspCurrent.x = this.bitogno.x + (this.bitogno.width / 2) - (TextWidth(this.dspCurrent.text) / 2);
 		this.dspCurrent.update();
 	}
+    this.setValeur = function(valeur) {
+        if (valeur <= this.min) {
+            this.bitogno.x = this.x - this.bitogno.width / 2;
+		}
+		else if (valeur >= this.max) {
+			this.bitogno.x = this.x + this.width - this.bitogno.width / 2;
+		}
+		else {
+            let percent = (valeur - this.min) / (this.max - this.min);
+			this.bitogno.x = this.x + this.width * percent - this.bitogno.width / 2;
+		}
+    }
 };
 
 function Sound(src, looping) {
@@ -889,6 +901,7 @@ function lancerOptions() {
     let btnRetour = new Button(Game.canvas.width / 2 - 128, 500, 256, 64, images3States.boutonFond, images.retour);
     let volumeDsp = new Text("16px", FONT, "white", 270, 312, `Volume :`);
     let barslider = new BarSlider(410, 300, 100, 16);
+    barslider.setValeur(Data.volume * 10);
     let keyboardDsp = new Text("16px", FONT, "white", 270, 362, `Keyboard :`);
     let btnFlecheGauche = new Button(370, 342, 32, 32, images3States.fleche_gauche, null);
     let btnFlecheDroite = new Button(530, 342, 32, 32, images3States.fleche_droite, null);
