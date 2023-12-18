@@ -1,29 +1,37 @@
 // constantes
 let MAIN_COOKIE = "saveHinnts";
-let WIDTH = 800;
-let HEIGHT = 600;
+let CANVAS_WIDTH = 1200;
+let CANVAS_HEIGHT = 800;
 let FONT = "Papyrus";
 let KEY_SKILL_1, KEY_SKILL_2, KEY_SKILL_3, KEY_SKILL_4;
+let LOADING_STATE = "LOADING_STATE", PLAY_STATE = "PLAY_STATE", LOST_STATE = "LOST_STATE", MENU_STATE = "MENU_STATE", OPTIONS_STATE = "OPTIONS_STATE";
 
 // Common content
-let images = {
-    default_cursor: NewImage("./img/default_cursor.png"),
-    focus_cursor: NewImage("./img/focus_cursor.png"),
-    mainBg: NewImage("./img/mainBg.png")
-};
+let images = {};
 let images3States = {};
-let titre, pluie, eclair, nuage1, brume1, nuage2, brume2;
+let titre, pluie1, pluie2, eclair, nuage1, brume1, nuage2, brume2;
 let audios = [];
 let scrolledUp, scrolledDown;
 let currentScore;
+let previousState, currentState;
 
+async function startGame() {
+    // Preload mandatory stuff
+    images.default_cursor = await NewImage("./img/default_cursor.png");
+    images.focus_cursor = await NewImage("./img/focus_cursor.png");
+    images.mainBg = await NewImage("./img/mainBg.png");
 
-function startGame() {
+    // Cookies
 	checkCookie(MAIN_COOKIE);
-	saveCookie();
+    saveCookie();
+
+    // Set up the game
+    Cursor.load();
     Game.setSkillsKeys();
     Game.start();
-    changeState("Chargement");
+
+    // Loading screen
+    changeState(LOADING_STATE);
 };
 
 let Data = {
@@ -35,8 +43,8 @@ let Data = {
 let Game = {
     canvas: document.createElement("canvas"),
     start: function () {
-        this.canvas.width = WIDTH;
-        this.canvas.height = HEIGHT;
+        this.canvas.width = CANVAS_WIDTH;
+        this.canvas.height = CANVAS_HEIGHT;
         this.canvas.style.cursor = "none";
         this.context = this.canvas.getContext("2d");
         document.getElementById("main").appendChild(this.canvas);
@@ -144,12 +152,17 @@ let Game = {
 };
 
 let Cursor = {
-	currentC: "default",
-    curseur: new Background(0, 0, 16, 16, images.default_cursor, "image"),
-    curseurTypes: [
-        { code: "default", image: images.default_cursor },
-        { code: "focus", image: images.focus_cursor }
-    ],
+	currentC: null,
+    curseur: null,
+    curseurTypes: null,
+    load: function () {
+        this.currentC = "default";
+        this.curseur = new ImageSameDim(0, 0, images.default_cursor);
+        this.curseurTypes = [
+            { code: "default", image: images.default_cursor },
+            { code: "focus", image: images.focus_cursor }
+        ]
+    },
 	changeCursor: function(type) {
 		if (type != this.currentC) {
 			this.currentC = type;
@@ -246,11 +259,11 @@ function Skills() {
 function Defender(width, height, sprite) {
     this.width = width;
     this.height = height;
-    this.x = WIDTH / 2 - width / 2;
-    this.y = HEIGHT / 2 - height / 2;
+    this.x = Game.canvas.width / 2 - width / 2;
+    this.y = Game.canvas.height / 2 - height / 2;
     this.xCenter = this.x + (this.width / 2);
     this.yCenter = this.y + (this.height / 2);
-    this.life = new LifeBar(250, 530, 300, 16, 100);
+    this.life = new LifeBar(Game.canvas.width / 2 - 150, Game.canvas.height - 70, 100);
     this.sprite = new Sprite(this.x, this.y, width, height, sprite, 0);
 	this.ombre = new SpriteAnimated(this.x - 16, this.y - 12.5, 100, 120, images.tour_ombre, 0, 5);
     this.update = function () {
@@ -398,26 +411,22 @@ function Shoot(x, y, width, height, xSpeed, ySpeed, skill, angle) {
 };
 
 function InterfaceSkills(skills) {
-    let tmpX = 300;
-    let tmpY = 50;
-    let x1 = 260, x2 = 332, x3 = 404, x4 = 476;
-    let y1 = HEIGHT - 41;
-    let w = 64;
-    let h = 32;
+    let x1 = 460, x2 = 532, x3 = 604, x4 = 676;
+    let y1 = Game.canvas.height - 41;
     this.skills = skills;
-    this.bg = new Background(WIDTH / 2 - tmpX / 2, HEIGHT - tmpY, tmpX, tmpY, images.interfaceSkills, "image");
-    this.bgSkill1 = new Background(x1, y1, w, h, images.sort, "image");
-    this.bgSkill2 = new Background(x2, y1, w, h, images.sort, "image");
-    this.bgSkill3 = new Background(x3, y1, w, h, images.sort, "image");
-    this.bgSkill4 = new Background(x4, y1, w, h, images.sort, "image");
-    this.bgSkillDown1 = new Background(x1, y1, w, h, images.sortAppuye, "image");
-    this.bgSkillDown2 = new Background(x2, y1, w, h, images.sortAppuye, "image");
-    this.bgSkillDown3 = new Background(x3, y1, w, h, images.sortAppuye, "image");
-    this.bgSkillDown4 = new Background(x4, y1, w, h, images.sortAppuye, "image");
-    this.skill1 = new Background(x1, y1, w, h, this.skills.skills1[this.skills.skillsPos1].image, "image");
-    this.skill2 = new Background(x2, y1, w, h, this.skills.skills2[this.skills.skillsPos2].image, "image");
-    this.skill3 = new Background(x3, y1, w, h, this.skills.skills3[this.skills.skillsPos3].image, "image");
-    this.skill4 = new Background(x4, y1, w, h, this.skills.skills4[this.skills.skillsPos4].image, "image");
+    this.bg = new ImageSameDim(Game.canvas.width / 2 - images.interfaceSkills.width / 2, Game.canvas.height - images.interfaceSkills.height, images.interfaceSkills);
+    this.bgSkill1 = new ImageSameDim(x1, y1, images.sort);
+    this.bgSkill2 = new ImageSameDim(x2, y1, images.sort);
+    this.bgSkill3 = new ImageSameDim(x3, y1, images.sort);
+    this.bgSkill4 = new ImageSameDim(x4, y1, images.sort);
+    this.bgSkillDown1 = new ImageSameDim(x1, y1, images.sortAppuye);
+    this.bgSkillDown2 = new ImageSameDim(x2, y1, images.sortAppuye);
+    this.bgSkillDown3 = new ImageSameDim(x3, y1, images.sortAppuye);
+    this.bgSkillDown4 = new ImageSameDim(x4, y1, images.sortAppuye);
+    this.skill1 = new ImageSameDim(x1, y1, this.skills.skills1[this.skills.skillsPos1].image);
+    this.skill2 = new ImageSameDim(x2, y1, this.skills.skills2[this.skills.skillsPos2].image);
+    this.skill3 = new ImageSameDim(x3, y1, this.skills.skills3[this.skills.skillsPos3].image);
+    this.skill4 = new ImageSameDim(x4, y1, this.skills.skills4[this.skills.skillsPos4].image);
     this.update = function () {
         this.bg.update();
         this.bgSkill1.update();
@@ -506,15 +515,17 @@ function SpriteAnimated(x, y, width, height, image, flip, vitesse) {
     }
 };
 
-function Button(x, y, width, height, image3States, imageTxt) {
+function Button(x, y, image3States, imageTxt) {
+    let defaultImg = image3States.normal; // Normal image is used for properties initialisations
     this.x = x;
     this.y = y;
-    this.width = width;
-    this.height = height;
+    this.width = defaultImg.width;
+    this.height = defaultImg.height;
     this.image3States = image3States;
-    this.fond = new Background(x, y, width, height, this.image3States.normal, "image");
+    this.fond = new ImageSameDim(x, y, defaultImg);
     if (imageTxt != null) {
-        this.texte = new Background(x, y, width, height, imageTxt, "image");
+        // Image must have same width and height than button to work properly
+        this.texte = new ImageSameDim(x, y, imageTxt);
     }
 	this.focused = false;
 	this.clickedDown = false;
@@ -572,16 +583,14 @@ function Button(x, y, width, height, image3States, imageTxt) {
     }
 };
 
-function Background(x, y, width, height, texture, type) {
+function ImageBase(x, y, width, height, texture) {
     this.x = x;
     this.y = y;
     this.width = width;
     this.height = height;
     this.speedX = 0;
     this.speedY = 0;
-    if (type == "image") {
-        this.image = texture;
-    }
+    this.image = texture;
     this.update = function () {
         ctx = Game.context;
         if (this.speedX != 0 || this.speedY != 0) {
@@ -600,13 +609,8 @@ function Background(x, y, width, height, texture, type) {
             }
 		}
         else {
-            if (type == "image") {
-                if (this.width != 0) {
-                    ctx.drawImage(this.image, 0, 0, this.width, this.height, this.x, this.y, this.width, this.height);
-                }
-            } else {
-                ctx.fillStyle = texture;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
+            if (this.width != 0) {
+                ctx.drawImage(this.image, 0, 0, this.width, this.height, this.x, this.y, this.width, this.height);
             }
         }
     }
@@ -615,6 +619,14 @@ function Background(x, y, width, height, texture, type) {
         this.speedY = sy;
     }
 };
+
+function ImageSameDim(x, y, texture) {
+    ImageBase.call(this, x, y, texture.width, texture.height, texture);
+}
+
+function ImageFull(texture) {
+    ImageBase.call(this, 0, 0, Game.canvas.width, Game.canvas.height, texture);
+}
 
 function Text(size, font, color, x, y, text) {
     this.size = size;
@@ -636,10 +648,10 @@ function Text(size, font, color, x, y, text) {
     }
 };
 
-function LifeBar(x, y, width, height, maxHP) {
-    this.contour = new Background(x - 3, y, width + 6, height + 2, images.contourVie, "image");
-    this.fond = new Background(x, y + 3, width, height - 4, images.fondVie, "image");
-    this.vie = new Background(x, y + 3, width, height - 4, images.vie, "image");
+function LifeBar(x, y, maxHP) {
+    this.contour = new ImageSameDim(x - 3, y, images.contourVie);
+    this.fond = new ImageSameDim(x, y + 3, images.fondVie);
+    this.vie = new ImageSameDim(x, y + 3, images.vie);
     this.dspVie = new Text("14px", FONT, "white", x + 135, y + 13, String(this.vie));
     this.maxHP = maxHP;
     this.currHP = maxHP;
@@ -661,8 +673,8 @@ function BarSlider(x, y, width, height) {
     this.height = height;
     this.min = 0;
     this.max = 10;
-    this.bar = new Background(x, y, 100, 16, images.barslide, "image");
-    this.bitogno = new Background(x + width / 2 - 8, y-4, 16, 24, images.barslide_bitogno, "image");
+    this.bar = new ImageSameDim(x, y, images.barslide);
+    this.bitogno = new ImageSameDim(x + width / 2 - 8, y-4, images.barslide_bitogno);
     this.dspMin = new Text("14px", FONT, "white", x-20, y + 12, String(this.min));
     this.dspMax = new Text("14px", FONT, "white", x + width + 10, y + 12, String(this.max));
     this.dspCurrent = new Text("14px", FONT, "white", x, y - 6, null);
@@ -762,24 +774,31 @@ function Sound(src, looping) {
 
 /* Fonctions boucle */
 function lancerChargement() {
-    let bg = new Background(0, 0, 800, 600, images.mainBg, "image");
+    let bg = new ImageFull(images.mainBg);
+    let currentLoadedImagesText = new Text("24px", FONT, "white", Game.canvas.width / 2, Game.canvas.height / 2, `Loading resources...`);
+    let cptResources = 0;
+    let currentResourceLoaded = 0;
 
     Game.interval = setInterval(update, 20);
-    buildCanvas();
+    loadResources();
 
     function update() {
         Game.update();
 
         bg.update();
 
+        if (cptResources > 0) {            
+            currentLoadedImagesText.text = `Loading resources : ${String(currentResourceLoaded)}/${String(cptResources)}`;
+        }
+        currentLoadedImagesText.x = Game.canvas.width / 2 - TextWidth(currentLoadedImagesText.text) / 2
+        currentLoadedImagesText.update();
+
 		Cursor.update();
     };
 
-    function buildCanvas() {
+    async function loadResources() {
         let fontSource = new FontFace(FONT, "url(font/PAPYRUS.TTF)");
-        fontSource.load().then(function(font){
-            document.fonts.add(font);
-        });
+        cptResources++;
 
         let sources = {
             titre: "./img/titre.png",
@@ -830,33 +849,39 @@ function lancerChargement() {
             fleche_droite_clic : "./img/fleche_droite_clic.png",
             fleche_droite_focus : "./img/fleche_droite_focus.png",
         };
-        let loadedImages = 0;
-        let numImages = 0;
-        for(let src in sources) {
-            numImages++;
-        }
-        for(let src in sources) {
-            images[src] = new Image();
-            images[src].onload = function() {
-                // Call the complete callback when all images loaded.
-                if (++loadedImages >= numImages) {
-                    loadGlobalVariables();
-                    changeState("Menu");
-                }
-            };
-            images[src].src = sources[src];
+        for (let src in sources) {
+            cptResources++;
         }
 
-        // Show image loading. with animation or something else...
-        //ctx.fillText("loading", 100,  130);
+        fontSource.load().then(function (font) {
+            document.fonts.add(font);
+            currentResourceLoaded++;
+        });
+        
+        for(let src in sources) {
+            images[src] = new Image();
+            images[src].src = sources[src];
+            await images[src].decode();
+            currentResourceLoaded++;
+        }
+
+        await new Promise(r => setTimeout(r, 100)); // Was triggered that you can't see the X/X loaded resources, you could only see X-1/X...
+
+        // When everything is loaded
+        loadGlobalVariables();
+        changeState(MENU_STATE);
     }
 };
 
 function lancerMenu() {
-    let btnJouer = new Button(Game.canvas.width / 2 - 128, 300, 256, 64, images3States.boutonFond, images.jouer);
-    let btnOptions = new Button(Game.canvas.width / 2 - 128, 400, 256, 64, images3States.boutonFond, images.options);
-    let bg = new Background(0, 0, 800, 600, images.mainBg, "image");
-
+    let btnJouer = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2, images3States.boutonFond, images.jouer);
+    let btnOptions = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2 + 100, images3States.boutonFond, images.options);
+    let bg = new ImageFull(images.mainBg);
+    let fadingBg = new ImageFull(images.mainBg);
+    let fadingOpacity = 1;
+    if (previousState == OPTIONS_STATE) {
+        fadingOpacity = 0; // Cancel the animation
+    }
 
     Game.interval = setInterval(update, 20);
 
@@ -865,10 +890,10 @@ function lancerMenu() {
         Game.update();
 
         if (btnJouer.isClicked()) {
-            changeState("Jouer");
+            changeState(PLAY_STATE);
         }
         if (btnOptions.isClicked()) {
-            changeState("Options");
+            changeState(OPTIONS_STATE);
         }
 
         bg.update();
@@ -881,7 +906,8 @@ function lancerMenu() {
 			eclair.update();
 		}
 
-        pluie.update();
+        pluie1.update();
+        pluie2.update();
 		nuage1.update();
 		nuage2.update();
 
@@ -890,25 +916,38 @@ function lancerMenu() {
         btnOptions.update();
 
 		brume1.update();
-		brume2.update();
+        brume2.update();
+
+        if (fadingOpacity > 0) {
+            Game.context.save();
+            Game.context.globalAlpha = fadingOpacity;
+            fadingOpacity -= 0.01;
+            fadingBg.update();
+            Game.context.restore();
+        }
 
 		Cursor.update();
     };
 };
 
 function lancerOptions() {
-    let bg = new Background(0, 0, 800, 600, images.mainBg, "image");
-    let btnRetour = new Button(Game.canvas.width / 2 - 128, 500, 256, 64, images3States.boutonFond, images.retour);
-    let volumeDsp = new Text("16px", FONT, "white", 270, 312, `Volume :`);
-    let barslider = new BarSlider(410, 300, 100, 16);
+    let bg = new ImageFull(images.mainBg);
+    let btnRetour = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2 + 100, images3States.boutonFond, images.retour);
+
+    let baseX = 460;
+    let baseY = 370;
+
+    let volumeDsp = new Text("16px", FONT, "white", baseX, baseY, `Volume :`);
+    let barslider = new BarSlider(baseX + 140, baseY - 12, 100, 16);
     barslider.setValeur(Data.volume * 10);
-    let keyboardDsp = new Text("16px", FONT, "white", 270, 362, `Keyboard :`);
-    let btnFlecheGauche = new Button(370, 342, 32, 32, images3States.fleche_gauche, null);
-    let btnFlecheDroite = new Button(530, 342, 32, 32, images3States.fleche_droite, null);
+
+    let keyboardDsp = new Text("16px", FONT, "white", baseX, baseY + 50, `Keyboard :`);
+    let btnFlecheGauche = new Button(baseX + 100, baseY + 30, images3States.fleche_gauche, null);
+    let btnFlecheDroite = new Button(baseX + 260, baseY + 30, images3States.fleche_droite, null);
     let keyboards = ["AZERTY", "QWERTY"];
     let currentKeyboardsIndex = keyboards.indexOf(Data.keyboard);
-    let currentKeyboardDsp = new Text("16px", FONT, "white", 466, 362, String(`${keyboards[currentKeyboardsIndex]}`));
-    currentKeyboardDsp.x = 466 - (TextWidth(currentKeyboardDsp.text) / 2);
+    let currentKeyboardDsp = new Text("16px", FONT, "white", baseX + 194, baseY + 50, String(`${keyboards[currentKeyboardsIndex]}`));
+    currentKeyboardDsp.x = baseX + 194 - (TextWidth(currentKeyboardDsp.text) / 2);
 
     Game.interval = setInterval(update, 20);
 
@@ -920,7 +959,7 @@ function lancerOptions() {
             Data.keyboard = keyboards[currentKeyboardsIndex];
             Game.setSkillsKeys();
             saveCookie();
-            changeState("Menu");
+            changeState(MENU_STATE);
         }
 
         if (btnFlecheGauche.isClicked()) {
@@ -945,7 +984,8 @@ function lancerOptions() {
 			eclair.update();
 		}
 
-        pluie.update();
+        pluie1.update();
+        pluie2.update();
 		nuage1.update();
 		nuage2.update();
 
@@ -954,7 +994,7 @@ function lancerOptions() {
         btnFlecheGauche.update();
         btnFlecheDroite.update();
         currentKeyboardDsp.text = String(`${keyboards[currentKeyboardsIndex]}`);
-        currentKeyboardDsp.x = 466 - (TextWidth(currentKeyboardDsp.text) / 2);
+        currentKeyboardDsp.x = baseX + 194 - (TextWidth(currentKeyboardDsp.text) / 2);
         currentKeyboardDsp.update();
 
         volumeDsp.update();
@@ -979,8 +1019,8 @@ function lancerJouer() {
     let text = new Text("16px", FONT, "white", 10, 30, null);
     let skills = new Skills();
     let interfaceSkills = new InterfaceSkills(skills);
-    let bg = new Background(0, 0, 800, 600, images.mainBg, "image");
-    let eclairRouge = new Background(0, 0, WIDTH, HEIGHT, images.eclairRouge, "image");
+    let bg = new ImageFull(images.mainBg);
+    let eclairRouge = new ImageFull(images.eclairRouge);
     let doEclairRouge = false;
     let currentSpawn = 0;
     let nextSpawn = 100;
@@ -1062,7 +1102,7 @@ function lancerJouer() {
 
         if (def.life.currHP == 0 && !isPerdu) {
             isPerdu = true;
-            changeState("Perdu");
+            changeState(LOST_STATE);
         }
 
         // update
@@ -1097,7 +1137,8 @@ function lancerJouer() {
             eclairRouge.time = 5;
         }
 
-        pluie.update();
+        pluie1.update();
+        pluie2.update();
 		nuage1.update();
 		nuage2.update();
 		brume1.update();
@@ -1114,15 +1155,18 @@ function lancerJouer() {
 };
 
 function lancerPerdu() {
-    let bg = new Background(0, 0, 800, 600, images.mainBg, "image");
-    let eclairRouge = new Background(0, 0, WIDTH, HEIGHT, images.eclairRouge, "image");
-    let btnRejouer = new Button(Game.canvas.width / 2 - 128, 400, 256, 64, images3States.boutonFond, images.rejouer);
-    let btnMenu = new Button(Game.canvas.width / 2 - 128, 500, 256, 64, images3States.boutonFond, images.menu);
-    let diededTitre = new Background(0, 0, 800, 300, images.dieded, "image");
-    let xText = 300;
-    let finalScoreDsp = new Text("24px", FONT, "white", xText, 250, `Final score : ${(currentScore == undefined ? 'none' : String(currentScore))}`);
+    let bg = new ImageFull(images.mainBg);
+    let eclairRouge = new ImageFull(images.eclairRouge);
+    let btnRejouer = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2, images3States.boutonFond, images.rejouer);
+    let btnMenu = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2 + 100, images3States.boutonFond, images.menu);
+    let diededTitre = new ImageSameDim(Game.canvas.width / 2 - images.dieded.width / 2, 0, images.dieded);
+
+    let baseX = 520;
+    let baseY = 270;
+
+    let finalScoreDsp = new Text("24px", FONT, "white", baseX, baseY, `Final score : ${(currentScore == undefined ? 'none' : String(currentScore))}`);
     let previousHighscore = Data.highestScore;
-    let previousHighscoreDsp = new Text("24px", FONT, "white", xText, 350, `(previous : ${(previousHighscore == undefined ? 'none' : previousHighscore)})`);
+    let previousHighscoreDsp = new Text("24px", FONT, "white", baseX, baseY + 100, `(previous : ${(previousHighscore == undefined ? 'none' : previousHighscore)})`);
 
     let isNewHighscore = false;
     if (currentScore != undefined) {
@@ -1133,9 +1177,9 @@ function lancerPerdu() {
         }
     }
 
-    let highscoreDsp = new Text("24px", FONT, "white", xText, 300, `Highscore : ${(Data.highestScore == undefined ? 'none' : String(Data.highestScore))}`);
-    let new1 = new Background(xText + 160, 275, 128, 32, images.new1, "image");
-    let new2 = new Background(xText + 160, 275, 128, 32, images.new2, "image");
+    let highscoreDsp = new Text("24px", FONT, "white", baseX, baseY + 50, `Highscore : ${(Data.highestScore == undefined ? 'none' : String(Data.highestScore))}`);
+    let new1 = new ImageSameDim(baseX + 160, baseY + 25, images.new1);
+    let new2 = new ImageSameDim(baseX + 160, baseY + 25, images.new2);
 
     Game.interval = setInterval(update, 40);
 
@@ -1144,10 +1188,10 @@ function lancerPerdu() {
         Game.update();
 
         if (btnRejouer.isClicked()) {
-            changeState("Jouer");
+            changeState(PLAY_STATE);
         }
         if (btnMenu.isClicked()) {
-            changeState("Menu");
+            changeState(MENU_STATE);
         }
 
         bg.update();
@@ -1162,7 +1206,8 @@ function lancerPerdu() {
 
         eclairRouge.update();
 
-        pluie.update();
+        pluie1.update();
+        pluie2.update();
 		nuage1.update();
 		nuage2.update();
 
@@ -1195,17 +1240,21 @@ function lancerPerdu() {
 };
 
 function loadGlobalVariables() {
-    titre = new Background(150, 0, 500, 300, images.titre, "image");
-    pluie = new Background(0, 0, WIDTH, HEIGHT, images.pluie, "image");
-    eclair = new Background(0, 0, WIDTH, HEIGHT, images.eclair, "image");
-    pluie.setSpeed(6,15);
-    nuage1 = new Background(0, 0, WIDTH, HEIGHT, images.nuage1, "image");
+    titre = new ImageSameDim(Game.canvas.width / 2 - images.titre.width / 2, 50, images.titre);
+    pluie1 = new ImageFull(images.pluie);
+    pluie1.setSpeed(6, 15);
+    pluie2 = new ImageFull(images.pluie);
+    pluie2.x += 20;
+    pluie2.y += 20;
+    pluie2.setSpeed(4, 9);
+    eclair = new ImageFull(images.eclair);
+    nuage1 = new ImageFull(images.nuage1);
     nuage1.setSpeed(1,0);
-    brume1 = new Background(0, 0, WIDTH, HEIGHT, images.brume1, "image");
+    brume1 = new ImageFull(images.brume1);
     brume1.setSpeed(2,0);
-    nuage2 = new Background(0, 0, WIDTH, HEIGHT, images.nuage2, "image");
+    nuage2 = new ImageFull(images.nuage2);
     nuage2.setSpeed(-1,0);
-    brume2 = new Background(0, 0, WIDTH, HEIGHT, images.brume2, "image");
+    brume2 = new ImageFull(images.brume2);
     brume2.setSpeed(-2,0);
 
     images3States.boutonFond = {
@@ -1232,19 +1281,21 @@ function loadGlobalVariables() {
 function changeState(newState) {
     clearInterval(Game.interval);
     Game.frameNo = 0;
-    if (newState == "Chargement") {
+    previousState = currentState;
+    currentState = newState;
+    if (newState == LOADING_STATE) {
         lancerChargement();
     }
-    if (newState == "Jouer") {
+    if (newState == PLAY_STATE) {
         lancerJouer();
     }
-    else if (newState == "Perdu") {
+    else if (newState == LOST_STATE) {
         lancerPerdu();
     }
-    else if (newState == "Menu") {
+    else if (newState == MENU_STATE) {
         lancerMenu();
     }
-    else if (newState == "Options") {
+    else if (newState == OPTIONS_STATE) {
         lancerOptions();
     }
 };
@@ -1268,9 +1319,10 @@ function rand(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min
 };
 
-function NewImage(url) {
+async function NewImage(url) {
     let img = new Image();
     img.src = url;
+    await img.decode();
     return img;
 }
 
