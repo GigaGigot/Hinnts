@@ -42,6 +42,37 @@ let Data = {
     keyboard: "AZERTY"
 }
 
+let LastGameSummary = {
+    killCount: 0,
+    highestDamageDealt: 0,
+    highestEnnemyHpDefeated: 0,
+    youCouldHaveList : [],
+    reset: function () {
+        this.killCount = 0;
+        this.highestDamageDealt = 0;
+        this.highestEnnemyHpDefeated = 0;
+        this.youCouldHaveList = [];
+    }
+}
+
+function YouCouldHaveStat(life, rule, divideValue) {
+    this.life = life;
+    this.rule = rule;
+    this.divideValue = divideValue;
+    this.done = false;
+    this.toClearString = function () {
+        if (this.rule == DMG_RULE_SQUARE) {
+            return `- Done the square root of ${this.life}`;
+        }
+        else if (this.rule == DMG_RULE_DIVIDE) {
+            return `- Divided ${this.life} by ${this.divideValue}`;
+        }
+        else {
+            return ""
+        }
+    }
+}
+
 let Game = {
     canvas: document.createElement("canvas"),
     start: function () {
@@ -327,6 +358,7 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
     this.hitboxInnerMargin = 7; // Arbitrary value
     this.dead = false;
     this.ERROR_IN_LIFE = false;
+    this.maxLife = life;
     this.life = life;
     this.lifeDsp = new Texte("16px", FONT, "white", x + TextWidth(String(this.life)), y - 2, String(this.life));
     this.sprite = new SpriteAnimated(x, y, width, height, image, image_reversed, flip, 8);
@@ -339,7 +371,6 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
     }
     this.newPos = function () {
         if (this.dead == true) {
-            console.log(this.speed);
             this.speed = Math.max(this.speed - 0.02, 0);
         }
         this.x += this.xSpeed * this.speed;
@@ -383,6 +414,16 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
             this.dieded();
         }
         else {
+            // stat
+            if (this.maxLife == oldLife) {
+                let youCouldHave = LastGameSummary.youCouldHaveList.find(e => e.life == this.maxLife);
+                if (youCouldHave != null) {
+                    if (youCouldHave.rule == skill.dmgRule && (youCouldHave.divideValue == null || youCouldHave.divideValue == skill.dmg)) {
+                        youCouldHave.done = true;
+                    }
+                }
+            }
+
             // Do score
             if (skill.scoreRule == SCORE_RULE_NONE) {
                 currentScore += skill.score;
@@ -394,11 +435,21 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
                 currentScore += (oldLife - newLife) * newLife;
             }
 
+            let damageDealt = oldLife - newLife;
+            if (LastGameSummary.highestDamageDealt == undefined || LastGameSummary.highestDamageDealt < damageDealt) {
+                LastGameSummary.highestDamageDealt = damageDealt;
+            }
+
             this.life = newLife;
             this.lifeDsp.text = this.life;
 
             if (newLife <= 0) {
                 this.dieded();
+                LastGameSummary.killCount++;
+
+                if (LastGameSummary.highestEnnemyHpDefeated == undefined || LastGameSummary.highestEnnemyHpDefeated < this.maxLife) {
+                    LastGameSummary.highestEnnemyHpDefeated = this.maxLife;
+                }
             }
         }
     }
@@ -716,6 +767,7 @@ function Texte(size, font, color, x, y, text) {
     this.y = y;
     this.bold = false;
     this.underline = false;
+    this.centered = false;
     if (text != null) {
         this.text = text;
     }
@@ -727,11 +779,16 @@ function Texte(size, font, color, x, y, text) {
         }
         ctx.font = boldDsp + this.size + " " + this.font;
         ctx.fillStyle = color;
-        ctx.fillText(this.text, this.x, this.y);
+        var textMeasurement = ctx.measureText(this.text);
+
+        var xOffset = 0;
+        if (this.centered) {
+            xOffset = -1 * (textMeasurement.width / 2);
+        }
+        ctx.fillText(this.text, this.x + xOffset, this.y);
 
         if (this.underline == true) {
-            var textMeasurement = ctx.measureText(this.text);
-            ctx.fillRect(this.x, this.y + textMeasurement.hangingBaseline * 0.5, textMeasurement.width, 2);
+            ctx.fillRect(this.x + xOffset, this.y + textMeasurement.hangingBaseline * 0.5, textMeasurement.width, 2);
         }
     }
     this.newPos = function (x, y) {
@@ -1222,6 +1279,7 @@ function lancerHowToPlay() {
 
 function lancerJouer() {
     currentScore = 0;
+    LastGameSummary.reset();
     let currentScoreDsp = new Texte("16px", FONT, "white", 10, 20, `Score : ${String(currentScore)}`);
     let shoots = [];
     let attackers = [];
@@ -1276,7 +1334,7 @@ function lancerJouer() {
         // Attackers
         currentSpawn += 1;
         if (currentSpawn == nextSpawn) {
-            let minLife = 1;
+            let minLife = 20;
             let maxLife = Math.round(5 + Math.pow(Game.frameNo, 1.2) / 250);
             let tmpLife = rand(minLife, maxLife);
             let adjustementPercentage = (tmpLife - maxLife) / maxLife;
@@ -1291,6 +1349,23 @@ function lancerJouer() {
             let dx = (def.xCenter - xRand);
             let dy = (def.yCenter - yRand);
             let mag = Math.sqrt(dx * dx + dy * dy);
+
+            if (tmpLife > 20) {
+                if (!LastGameSummary.youCouldHaveList.some(e => e.tmpLife === tmpLife)) {
+                    if (Math.sqrt(tmpLife) % 1 === 0) {
+                        LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_SQUARE, null));
+                    }
+                    else if ((tmpLife / 11) % 1 === 0) {
+                        LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_DIVIDE, 11));
+                    }
+                    else if ((tmpLife / 7) % 1 === 0) {
+                        LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_DIVIDE, 7));
+                    }
+                    else if ((tmpLife / 3) % 1 === 0) {
+                        LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_DIVIDE, 3));
+                    }
+                }
+            }
 
             attackers.push(new Attacker(48, 48, images.sprite_mob, images.sprite_mob_reversed, xRand, yRand, (dx / mag), (dy / mag), r, tmpLife));
         }
@@ -1394,16 +1469,18 @@ function IsTooClose(x1, y1, x2, y2) {
 function lancerPerdu() {
     let bg = new ImageFull(images.mainBg);
     let eclairRouge = new ImageFull(images.eclairRouge);
-    let btnRejouer = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2, images3States.boutonFond, images.rejouer);
-    let btnMenu = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2 + 100, images3States.boutonFond, images.menu);
+    let btnRejouer = new Button(Game.canvas.width / 2 - 128 - 150, Game.canvas.height / 2 + 300, images3States.boutonFond, images.rejouer);
+    let btnMenu = new Button(Game.canvas.width / 2 - 128 + 150, Game.canvas.height / 2 + 300, images3States.boutonFond, images.menu);
     let diededTitre = new ImageSameDim(Game.canvas.width / 2 - images.dieded.width / 2, 0, images.dieded);
 
-    let baseX = 520;
-    let baseY = 270;
+    let baseX = 50;
+    let baseY = 380;
 
-    let finalScoreDsp = new Texte("24px", FONT, "white", baseX, baseY, `Final score : ${(currentScore == undefined ? 'none' : String(currentScore))}`);
+    let finalScoreTexteDsp = new Texte("42px", FONT, "white", baseX + 50, baseY, `Final score`);
+    let finalScoreDsp = new Texte("120px", FONT, "white", baseX + 150, baseY + 100, `${(currentScore == undefined ? 'none' : String(currentScore))}`);
+    finalScoreDsp.centered = true;
     let previousHighscore = Data.highestScore;
-    let previousHighscoreDsp = new Texte("24px", FONT, "white", baseX, baseY + 100, `(previous : ${(previousHighscore == undefined ? 'none' : previousHighscore)})`);
+    let previousHighscoreDsp = new Texte("24px", FONT, "white", baseX + 50, baseY + 200, `(previous : ${(previousHighscore == undefined ? 'none' : previousHighscore)})`);
 
     let isNewHighscore = false;
     if (currentScore != undefined) {
@@ -1414,14 +1491,45 @@ function lancerPerdu() {
         }
     }
 
-    let highscoreDsp = new Texte("24px", FONT, "white", baseX, baseY + 50, `Highscore : ${(Data.highestScore == undefined ? 'none' : String(Data.highestScore))}`);
-    let new1 = new ImageSameDim(baseX + 160, baseY + 25, images.new1);
-    let new2 = new ImageSameDim(baseX + 160, baseY + 25, images.new2);
+    let highscoreDsp = new Texte("24px", FONT, "white", baseX + 50, baseY + 160, `Highscore : ${(Data.highestScore == undefined ? 'none' : String(Data.highestScore))}`);
+    let new1 = new ImageSameDim(baseX + 230, baseY + 135, images.new1);
+    let new2 = new ImageSameDim(baseX + 230, baseY + 135, images.new2);
+
+
+    let killCountDsp = new Texte("26px", FONT, "white", baseX + 450, baseY - 80, "Gracefully killed ennemy count : ");
+    let killCountVal = new Texte("26px", FONT, "white", baseX + 820, baseY - 80, `${(LastGameSummary.killCount == undefined ? 0 : LastGameSummary.killCount)}`);
+
+    let highestDamageDealtDsp = new Texte("26px", FONT, "white", baseX + 450, baseY - 40, "Highest damage dealt : ");
+    let highestDamageDealtVal = new Texte("26px", FONT, "white", baseX + 820, baseY - 40, `${(LastGameSummary.highestDamageDealt == undefined ? 0 : LastGameSummary.highestDamageDealt)}`);
+
+    let highestEnnemyHpDefeatedDsp = new Texte("26px", FONT, "white", baseX + 450, baseY, "Highest HP ennemy defeated : ");
+    let highestEnnemyHpDefeatedVal = new Texte("26px", FONT, "white", baseX + 820, baseY, `${(LastGameSummary.highestEnnemyHpDefeated == undefined ? 0 : LastGameSummary.highestEnnemyHpDefeated)}`);
+
+    let atLeastOneYouCouldHave = false;
+    let youCouldHaveDsp = new Texte("26px", FONT, "white", baseX + 450, baseY + 80, "You could have...");
+    let youCouldHaveDsp1 = new Texte("26px", FONT, "white", baseX + 480, baseY + 120, "");
+    let youCouldHaveDsp2 = new Texte("26px", FONT, "white", baseX + 480, baseY + 160, "");
+    let youCouldHaveDsp3 = new Texte("26px", FONT, "white", baseX + 480, baseY + 200, "");
+    let youCouldHaveListFiltered = LastGameSummary.youCouldHaveList.filter(e => !e.done).sort(e => e.tmpLife * -1);
+    if (youCouldHaveListFiltered.length > 0) {
+        atLeastOneYouCouldHave = true;
+        if (youCouldHaveListFiltered.length == 1) {
+            youCouldHaveDsp1.text = youCouldHaveListFiltered[0].toClearString();
+        }
+        else if (youCouldHaveListFiltered.length == 2) {
+            youCouldHaveDsp1.text = youCouldHaveListFiltered[1].toClearString();
+            youCouldHaveDsp2.text = youCouldHaveListFiltered[0].toClearString();
+        }
+        else {
+            youCouldHaveDsp1.text = youCouldHaveListFiltered[2].toClearString();
+            youCouldHaveDsp2.text = youCouldHaveListFiltered[1].toClearString();
+            youCouldHaveDsp3.text = youCouldHaveListFiltered[0].toClearString();
+        }
+    }
 
     Game.interval = setInterval(update, 40);
 
     function update() {
-        // Game
         Game.update();
 
         if (btnRejouer.isClicked()) {
@@ -1445,6 +1553,7 @@ function lancerPerdu() {
         btnRejouer.update();
         btnMenu.update();
 
+        finalScoreTexteDsp.update();
         finalScoreDsp.update();
         highscoreDsp.update();
 
@@ -1460,6 +1569,22 @@ function lancerPerdu() {
             else {
                 new2.time = 40;
             }
+        }
+
+        highestDamageDealtDsp.update();
+        highestDamageDealtVal.update();
+
+        killCountDsp.update();
+        killCountVal.update();
+
+        highestEnnemyHpDefeatedDsp.update();
+        highestEnnemyHpDefeatedVal.update();
+
+        if (atLeastOneYouCouldHave) {
+            youCouldHaveDsp.update();
+            youCouldHaveDsp1.update();
+            youCouldHaveDsp2.update();
+            youCouldHaveDsp3.update();
         }
 
 		brume1.update();
@@ -1663,7 +1788,7 @@ function setCookie(cname, cvalue, exdays) {
     let d = new Date();
     d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
     let expires = "expires=" + d.toUTCString();
-    document.cookie = cname + "=" + cvalue + "; " + expires;
+    document.cookie = cname + "=" + cvalue + "; " + expires + "; SameSite=Strict";
 };
 
 function getCookie(name) {
