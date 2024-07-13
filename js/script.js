@@ -4,7 +4,7 @@ let CANVAS_WIDTH = 1200;
 let CANVAS_HEIGHT = 800;
 let FONT = "Papyrus";
 let KEY_SKILL_1, KEY_SKILL_2, KEY_SKILL_3, KEY_SKILL_4;
-let LOADING_STATE = "LOADING_STATE", PLAY_STATE = "PLAY_STATE", LOST_STATE = "LOST_STATE", MENU_STATE = "MENU_STATE", OPTIONS_STATE = "OPTIONS_STATE";
+let LOADING_STATE = "LOADING_STATE", PLAY_STATE = "PLAY_STATE", LOST_STATE = "LOST_STATE", MENU_STATE = "MENU_STATE", OPTIONS_STATE = "OPTIONS_STATE", LORE_STATE = "LORE_STATE", HOWTOPLAY_STATE = "HOWTOPLAY_STATE";
 let DMG_RULE_FIXE = "FIXE", DMG_RULE_DIVIDE = "DIVIDE", DMG_RULE_SQUARE = "SQUARE";
 let SCORE_RULE_NONE = "NONE", SCORE_RULE_HP_LOSS = "HP_LOSS", SCORE_RULE_SQUARE = "SQUARE";
 
@@ -328,7 +328,7 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
     this.dead = false;
     this.ERROR_IN_LIFE = false;
     this.life = life;
-    this.lifeDsp = new Text("16px", FONT, "white", x + TextWidth(String(this.life)), y - 2, String(this.life));
+    this.lifeDsp = new Texte("16px", FONT, "white", x + TextWidth(String(this.life)), y - 2, String(this.life));
     this.sprite = new SpriteAnimated(x, y, width, height, image, image_reversed, flip, 8);
     this.update = function () {
 		if (this.dead == false) {
@@ -709,19 +709,30 @@ function ImageFull(texture) {
     ImageBase.call(this, 0, 0, Game.canvas.width, Game.canvas.height, texture);
 }
 
-function Text(size, font, color, x, y, text) {
+function Texte(size, font, color, x, y, text) {
     this.size = size;
     this.font = font;
     this.x = x;
     this.y = y;
+    this.bold = false;
+    this.underline = false;
     if (text != null) {
         this.text = text;
     }
     this.update = function () {
         ctx = Game.context;
-        ctx.font = this.size + " " + this.font;
+        let boldDsp = "";
+        if (this.bold == true) {
+            boldDsp = "bold ";
+        }
+        ctx.font = boldDsp + this.size + " " + this.font;
         ctx.fillStyle = color;
         ctx.fillText(this.text, this.x, this.y);
+
+        if (this.underline == true) {
+            var textMeasurement = ctx.measureText(this.text);
+            ctx.fillRect(this.x, this.y + textMeasurement.hangingBaseline * 0.5, textMeasurement.width, 2);
+        }
     }
     this.newPos = function (x, y) {
         this.x = x;
@@ -733,7 +744,7 @@ function LifeBar(x, y, maxHP) {
     this.contour = new ImageSameDim(x - 3, y, images.contourVie);
     this.fond = new ImageSameDim(x, y + 3, images.fondVie);
     this.vie = new ImageSameDim(x, y + 3, images.vie);
-    this.dspVie = new Text("14px", FONT, "white", x + 135, y + 13, String(this.vie));
+    this.dspVie = new Texte("14px", FONT, "white", x + 135, y + 13, String(this.vie));
     this.maxHP = maxHP;
     this.currHP = maxHP;
     this.update = function () {
@@ -756,9 +767,9 @@ function BarSlider(x, y, width, height) {
     this.max = 10;
     this.bar = new ImageSameDim(x, y, images.barslide);
     this.bitogno = new ImageSameDim(x + width / 2 - 8, y-4, images.barslide_bitogno);
-    this.dspMin = new Text("14px", FONT, "white", x-20, y + 12, String(this.min));
-    this.dspMax = new Text("14px", FONT, "white", x + width + 10, y + 12, String(this.max));
-    this.dspCurrent = new Text("14px", FONT, "white", x, y - 6, null);
+    this.dspMin = new Texte("14px", FONT, "white", x-20, y + 12, String(this.min));
+    this.dspMax = new Texte("14px", FONT, "white", x + width + 10, y + 12, String(this.max));
+    this.dspCurrent = new Texte("14px", FONT, "white", x, y - 6, null);
 	this.bitognoClicked = false;
     this.update = function () {
 		this.onFocus();
@@ -856,7 +867,7 @@ function Sound(src, looping) {
 /* Fonctions boucle */
 function lancerChargement() {
     let bg = new ImageFull(images.mainBg);
-    let currentLoadedImagesText = new Text("24px", FONT, "white", Game.canvas.width / 2, Game.canvas.height / 2, `Loading resources...`);
+    let currentLoadedImagesText = new Texte("24px", FONT, "white", Game.canvas.width / 2, Game.canvas.height / 2, `Loading resources...`);
     let cptResources = 0;
     let currentResourceLoaded = 0;
 
@@ -933,7 +944,8 @@ function lancerChargement() {
             fleche_gauche_focus : "./img/fleche_gauche_focus.png",
             fleche_droite : "./img/fleche_droite.png",
             fleche_droite_clic : "./img/fleche_droite_clic.png",
-            fleche_droite_focus : "./img/fleche_droite_focus.png",
+            fleche_droite_focus: "./img/fleche_droite_focus.png",
+            skills_details: "./img/skills_details.png",
         };
         for (let src in sources) {
             cptResources++;
@@ -967,7 +979,7 @@ function lancerMenu() {
     let bg = new ImageFull(images.mainBg);
     let fadingBg = new ImageFull(images.mainBg);
     let fadingOpacity = 1;
-    if (previousState == OPTIONS_STATE) {
+    if (previousState == OPTIONS_STATE || previousState == LORE_STATE || previousState == HOWTOPLAY_STATE) {
         fadingOpacity = 0; // Cancel the animation
     }
 
@@ -982,6 +994,12 @@ function lancerMenu() {
         }
         if (btnOptions.isClicked()) {
             changeState(OPTIONS_STATE);
+        }
+        if (btnLore.isClicked()) {
+            changeState(LORE_STATE);
+        }
+        if (btnHowToPlay.isClicked()) {
+            changeState(HOWTOPLAY_STATE);
         }
 
         bg.update();
@@ -1020,16 +1038,16 @@ function lancerOptions() {
     let baseX = 460;
     let baseY = 420;
 
-    let volumeDsp = new Text("16px", FONT, "white", baseX, baseY, `Volume :`);
+    let volumeDsp = new Texte("16px", FONT, "white", baseX, baseY, `Volume :`);
     let barslider = new BarSlider(baseX + 140, baseY - 12, 100, 16);
     barslider.setValeur(Data.volume * 10);
 
-    let keyboardDsp = new Text("16px", FONT, "white", baseX, baseY + 50, `Keyboard :`);
+    let keyboardDsp = new Texte("16px", FONT, "white", baseX, baseY + 50, `Keyboard :`);
     let btnFlecheGauche = new Button(baseX + 100, baseY + 30, images3States.fleche_gauche, null);
     let btnFlecheDroite = new Button(baseX + 260, baseY + 30, images3States.fleche_droite, null);
     let keyboards = ["AZERTY", "QWERTY"];
     let currentKeyboardsIndex = keyboards.indexOf(Data.keyboard);
-    let currentKeyboardDsp = new Text("16px", FONT, "white", baseX + 194, baseY + 50, String(`${keyboards[currentKeyboardsIndex]}`));
+    let currentKeyboardDsp = new Texte("16px", FONT, "white", baseX + 194, baseY + 50, String(`${keyboards[currentKeyboardsIndex]}`));
     currentKeyboardDsp.x = baseX + 194 - (TextWidth(currentKeyboardDsp.text) / 2);
 
     Game.interval = setInterval(update, 20);
@@ -1092,13 +1110,123 @@ function lancerOptions() {
     };
 };
 
+function lancerLore() {
+    let bg = new ImageFull(images.mainBg);
+    let btnRetour = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2 + 200, images3States.boutonFond, images.retour);
+
+    let loreTextMargin = 50;
+    let loreText = `Back in 2015, during high school, a friend and I came up with the idea of creating a mental arithmetic game. I initially put together a Proof of Concept but soon lost interest and forgot about it. Years later, I stumbled upon the project in my folders and decided to dust it off, making improvements here and there. After several years of on-and-off tinkering, I finally revamped it enough to release the final version. 'Hinnts' is a reference to 'int' in programming, reflecting the core gameplay mechanics of this game. I know what some people might say, but NO, the Papyrus font STAYS ON; it was cool back then. Anyway, enjoy this little game!`;
+
+    Game.interval = setInterval(update, 20);
+
+    function update() {
+        // Game
+        Game.update();
+
+        if (btnRetour.isClicked()) {
+            changeState(MENU_STATE);
+        }
+
+        bg.update();
+        UpdateEclair();
+
+        pluie1.update();
+        pluie2.update();
+		nuage1.update();
+		nuage2.update();
+
+        btnRetour.update();
+      
+        PrintWrappingText(loreText, 38, loreTextMargin, 100, CANVAS_WIDTH - loreTextMargin * 2, true);
+
+		brume1.update();
+		brume2.update();
+
+		Cursor.update();
+    };
+};
+
+function lancerHowToPlay() {
+    let bg = new ImageFull(images.mainBg);
+    let btnRetour = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2 + 200, images3States.boutonFond, images.retour);
+
+    let baseX = 50;
+    let baseY = 120;
+    let maxWidth = 650;
+
+    let title1 = new Texte("38px", FONT, "white", baseX + 650 / 2 - 140, baseY - 40, "Essential Info");
+    title1.bold = true;
+    title1.underline = true;
+    let info1 = "- Press and release skills key to fire their corresponding arithmetic calculation";
+    let info2 = "- Hold and scroll up/down to modify a skill key multiplier (when available)";
+    let info3 = "- Reduce the enemies' HP to 0 to defeat them properly";
+    let info4 = "- Damaging an enemy to a decimal HP makes them explode and causes you to lose a lot of HP. Be careful!";
+    let skillsDetails = new ImageSameDim(Game.canvas.width - images.skills_details.width - 50, 100, images.skills_details);
+    let keysText = "";
+    let spacing = "        ";
+    switch (Data.keyboard) {
+        case "AZERTY":
+            keysText = `A${spacing}Z${spacing}E${spacing}R`;
+            break;
+        case "QWERTY":
+            spacing = spacing.substring(1); // bigger letters
+            keysText = `Q${spacing}W${spacing}E${spacing} R`;
+            break;
+    }
+    let keysTextDsp = new Texte("28px", FONT, "white", skillsDetails.x + 40, skillsDetails.y + skillsDetails.height + 16, keysText);
+    let title2 = new Texte("38px", FONT, "white", baseX, baseY + 370, "Other tips");
+    title2.bold = true;
+    title2.underline = true;
+    let info5 = "- Cancel an held skill by moving the pointer to the center and releasing the key";
+    let info6 = "- The higher the amount of damage dealt to an ennemy, the higher the score you'll obtain!";
+    let info7 = "- The more complex the arithmetic operation you use, the higher the score you'll obtain!";
+
+    Game.interval = setInterval(update, 20);
+
+    function update() {
+        // Game
+        Game.update();
+
+        if (btnRetour.isClicked()) {
+            changeState(MENU_STATE);
+        }
+
+        bg.update();
+        UpdateEclair();
+
+        pluie1.update();
+        pluie2.update();
+		nuage1.update();
+		nuage2.update();
+
+        btnRetour.update();
+
+        title1.update();
+        PrintWrappingText(info1, 24, baseX, baseY + 20, maxWidth, false);
+        PrintWrappingText(info2, 24, baseX, baseY + 90, maxWidth, false);
+        PrintWrappingText(info3, 24, baseX, baseY + 160, maxWidth, false);
+        PrintWrappingText(info4, 24, baseX, baseY + 200, maxWidth, false);
+        skillsDetails.update();
+        keysTextDsp.update();
+        title2.update();
+        PrintWrappingText(info5, 24, baseX + 220, baseY + 320, maxWidth + 250, false);
+        PrintWrappingText(info6, 24, baseX + 220, baseY + 370, maxWidth + 250, false);
+        PrintWrappingText(info7, 24, baseX + 220, baseY + 420, maxWidth + 250, false);
+
+		brume1.update();
+		brume2.update();
+
+		Cursor.update();
+    };
+};
+
 function lancerJouer() {
     currentScore = 0;
-    let currentScoreDsp = new Text("16px", FONT, "white", 10, 20, `Score : ${String(currentScore)}`);
+    let currentScoreDsp = new Texte("16px", FONT, "white", 10, 20, `Score : ${String(currentScore)}`);
     let shoots = [];
     let attackers = [];
     let def = new Defender(64, 64, images.tour);
-    let text = new Text("16px", FONT, "white", 10, 30, null);
+    let text = new Texte("16px", FONT, "white", 10, 30, null);
     let skills = new Skills();
     let interfaceSkills = new InterfaceSkills(skills);
     let bg = new ImageFull(images.mainBg);
@@ -1273,9 +1401,9 @@ function lancerPerdu() {
     let baseX = 520;
     let baseY = 270;
 
-    let finalScoreDsp = new Text("24px", FONT, "white", baseX, baseY, `Final score : ${(currentScore == undefined ? 'none' : String(currentScore))}`);
+    let finalScoreDsp = new Texte("24px", FONT, "white", baseX, baseY, `Final score : ${(currentScore == undefined ? 'none' : String(currentScore))}`);
     let previousHighscore = Data.highestScore;
-    let previousHighscoreDsp = new Text("24px", FONT, "white", baseX, baseY + 100, `(previous : ${(previousHighscore == undefined ? 'none' : previousHighscore)})`);
+    let previousHighscoreDsp = new Texte("24px", FONT, "white", baseX, baseY + 100, `(previous : ${(previousHighscore == undefined ? 'none' : previousHighscore)})`);
 
     let isNewHighscore = false;
     if (currentScore != undefined) {
@@ -1286,7 +1414,7 @@ function lancerPerdu() {
         }
     }
 
-    let highscoreDsp = new Text("24px", FONT, "white", baseX, baseY + 50, `Highscore : ${(Data.highestScore == undefined ? 'none' : String(Data.highestScore))}`);
+    let highscoreDsp = new Texte("24px", FONT, "white", baseX, baseY + 50, `Highscore : ${(Data.highestScore == undefined ? 'none' : String(Data.highestScore))}`);
     let new1 = new ImageSameDim(baseX + 160, baseY + 25, images.new1);
     let new2 = new ImageSameDim(baseX + 160, baseY + 25, images.new2);
 
@@ -1445,6 +1573,12 @@ function changeState(newState) {
     else if (newState == OPTIONS_STATE) {
         lancerOptions();
     }
+    else if (newState == LORE_STATE) {
+        lancerLore();
+    }
+    else if (newState == HOWTOPLAY_STATE) {
+        lancerHowToPlay();
+    }
 };
 
 function outOfCanvas(object, canvas) {
@@ -1476,6 +1610,51 @@ async function NewImage(url) {
 function TextWidth(txt) {
     return Game.context.measureText(txt).width;
 }
+
+function PrintWrappingText(text, fontSize, x, y, fitWidth, center) {
+    Game.context.save();
+    Game.context.font = `${fontSize}px ${FONT}`;
+    fitWidth = fitWidth || 0;
+
+    if (fitWidth <= 0) {
+        Game.context.fillText(text, x, y);
+        return;
+    }
+    var words = text.split(' ');
+    var currentLine = 0;
+    var idx = 1;
+    while (words.length > 0 && idx <= words.length) {
+        var str = words.slice(0, idx).join(' ');
+        var w = Game.context.measureText(str).width;
+        if (w > fitWidth) {
+            if (idx == 1) {
+                idx = 2;
+            }
+            var textToRender = words.slice(0, idx - 1).join(' ');
+            var textOffset = 0;
+            if (center) {
+                var textWidth = Game.context.measureText(textToRender).width;
+                textOffset = (fitWidth - textWidth) / 2;
+            }
+            Game.context.fillText(textToRender, x + textOffset, y + (fontSize * 1.3 * currentLine));
+            currentLine++;
+            words = words.splice(idx - 1);
+            idx = 1;
+        }
+        else { idx++; }
+    }
+    if (idx > 0) {
+        var textToRender = words.join(' ');
+        var textOffset = 0;
+        if (center) {
+            var textWidth = Game.context.measureText(textToRender).width;
+            textOffset = (fitWidth - textWidth) / 2;
+        }
+        Game.context.fillText(textToRender, x + textOffset, y + (fontSize * 1.3 * currentLine));
+    }
+    Game.context.restore();
+}
+
 ///////////////////////
 
 
