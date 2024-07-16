@@ -85,7 +85,7 @@ let Game = {
 
         // init
         window.addEventListener('click', function(e) {
-            this.music = new Sound("./sound/soundtrackv4.wav", true);
+            this.music = new Sound("./sound/soundtrackv5.wav", true);
             this.music.play();
         }, {once: true});
 
@@ -224,8 +224,8 @@ function Skills() {
     this.skillsPos2 = 0,
     this.skills3 = [
         { code: "diviseParDix", image: images.diviseParDix, dmg: 10, dmgRule: DMG_RULE_DIVIDE, score: 10, scoreRule: SCORE_RULE_HP_LOSS },
-        { code: "diviseParCent", image: images.diviseParCent, dmg: 100, dmgRule: DMG_RULE_DIVIDE, score: 100, scoreRule: SCORE_RULE_HP_LOSS },
-        { code: "diviseParMille", image: images.diviseParMille, dmg: 1000, dmgRule: DMG_RULE_DIVIDE, score: 1000, scoreRule: SCORE_RULE_HP_LOSS }
+        { code: "diviseParCent", image: images.diviseParCent, dmg: 100, dmgRule: DMG_RULE_DIVIDE, score: 20, scoreRule: SCORE_RULE_HP_LOSS },
+        { code: "diviseParMille", image: images.diviseParMille, dmg: 1000, dmgRule: DMG_RULE_DIVIDE, score: 30, scoreRule: SCORE_RULE_HP_LOSS }
     ],
     this.skillsPos3 = 0,
     this.skills4 =  [
@@ -297,7 +297,7 @@ function Defender(width, height, sprite) {
     this.hitboxInnerMargin = 5; // Arbitrary value
     this.xCenter = this.x + (this.width / 2);
     this.yCenter = this.y + (this.height / 2);
-    this.life = new LifeBar(Game.canvas.width / 2 - 150, Game.canvas.height - 70, 100);
+    this.life = new LifeBar(Game.canvas.width / 2 - 97, Game.canvas.height - 110);
     this.sprite = new Sprite(this.x, this.y, width, height, sprite, 0);
     this.ombre = new Sprite(this.x - 18, this.y - 18, 100, 100, images.tour_ombre, 0);
     this.joueur = new Sprite(this.x - 18, this.y - 18, 100, 100, images.joueur, 0);
@@ -305,8 +305,12 @@ function Defender(width, height, sprite) {
     this.cptTooClose = 0;
     this.update = function () {
         // Regen
-        if (everyInterval(50) && this.life.currHP < this.life.maxHP) {
-            this.life.currHP++;
+        if (everyInterval(20) && this.life.currHP < this.life.maxHP) {
+            this.life.regeneratingHP++;
+            if (this.life.regeneratingHP >= 100) {
+                this.life.regeneratingHP = 0;
+                this.life.currHP++;
+            }
         }
 
         // Make the shadow spin indefinitely
@@ -339,6 +343,7 @@ function Defender(width, height, sprite) {
     }
     this.decreaseLife = function (dmg) {
         this.life.currHP -= dmg;
+        this.life.regeneratingHP = 0;
         if (this.life.currHP < 0) {
             this.life.currHP = 0;
         }
@@ -429,10 +434,10 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
                 currentScore += skill.score;
             }
             else if (skill.scoreRule == SCORE_RULE_HP_LOSS) {
-                currentScore += (oldLife - newLife) * skill.score;
+                currentScore += Math.round(Math.log2(oldLife - newLife) * skill.score);
             }
             else if (skill.scoreRule == SCORE_RULE_SQUARE) {
-                currentScore += (oldLife - newLife) * newLife;
+                currentScore += Math.round(Math.log2(oldLife - newLife) * newLife);
             }
 
             let damageDealt = oldLife - newLife;
@@ -797,21 +802,58 @@ function Texte(size, font, color, x, y, text) {
     }
 };
 
-function LifeBar(x, y, maxHP) {
-    this.contour = new ImageSameDim(x - 3, y, images.contourVie);
-    this.fond = new ImageSameDim(x, y + 3, images.fondVie);
-    this.vie = new ImageSameDim(x, y + 3, images.vie);
-    this.dspVie = new Texte("14px", FONT, "white", x + 135, y + 13, String(this.vie));
-    this.maxHP = maxHP;
-    this.currHP = maxHP;
+function LifeBar(x, y) {
+    this.contour1 = new ImageSameDim(x, y, images.heartLifeBorder);
+    this.fond1 = new ImageSameDim(x, y, images.heartLifeEmpty);
+    this.vie1 = new ImageSameDim(x, y, images.heartLifeFull);
+
+    this.contour2 = new ImageSameDim(x + 64, y, images.heartLifeBorder);
+    this.fond2 = new ImageSameDim(x + 64, y, images.heartLifeEmpty);
+    this.vie2 = new ImageSameDim(x + 64, y, images.heartLifeFull);
+    this.regen2 = new ImageSameDim(x + 64, y, images.heartLifeRegenerating);
+
+    this.contour3 = new ImageSameDim(x + 128, y, images.heartLifeBorder);
+    this.fond3 = new ImageSameDim(x + 128, y, images.heartLifeEmpty);
+    this.vie3 = new ImageSameDim(x + 128, y, images.heartLifeFull);
+    this.regen3 = new ImageSameDim(x + 128, y, images.heartLifeRegenerating);
+
+    this.maxHP = 3;
+    this.currHP = this.maxHP;
+    this.regeneratingHP = 0;
     this.update = function () {
-        this.contour.update();
-        this.fond.update();
-        this.vie.width = (this.currHP * this.fond.width) / 100;
-        this.vie.update();
-        this.dspVie.text = this.currHP;
-        this.dspVie.x = this.fond.x + (this.fond.width / 2) - (TextWidth(this.dspVie.text) / 2);
-        this.dspVie.update();
+        this.fond1.update();
+        if (this.currHP > 0) {
+            this.vie1.update();
+        }
+        this.contour1.update();
+
+        this.vie2.update();
+        if (this.currHP == 1) {
+            this.regen2.update();
+            this.fond2.height = (this.vie2.height - 22) * (Math.abs((this.regeneratingHP - 100) / 100)) + 11;
+            this.fond2.update();
+        }
+        else if (this.currHP < 1) {
+            if (this.fond2.height != this.vie2.height) {
+                this.fond2.height = this.vie2.height;
+            }
+            this.fond2.update();
+        }
+        this.contour2.update();
+
+        this.vie3.update();
+        if (this.currHP == 2) {
+            this.regen3.update();
+            this.fond3.height = (this.vie3.height - 22) * (Math.abs((this.regeneratingHP - 100) / 100)) + 11;
+            this.fond3.update();
+        }
+        else if (this.currHP < 2) {
+            if (this.fond3.height != this.vie3.height) {
+                this.fond3.height = this.vie3.height;
+            }
+            this.fond3.update();
+        }
+        this.contour3.update();
     }
 };
 
@@ -965,6 +1007,10 @@ function lancerChargement() {
             contourVie: "./img/contourVie.png",
             fondVie: "./img/fondVie.png",
             vie: "./img/vie.png",
+            heartLifeBorder: "./img/heartLifeBorder.png",
+            heartLifeEmpty: "./img/heartLifeEmpty.png",
+            heartLifeFull: "./img/heartLifeFull.png",
+            heartLifeRegenerating: "./img/heartLifeRegenerating.png",
             barslide: "./img/barslide.png",
             barslide_bitogno: "./img/barslide_bitogno.png",
             jouer: "./img/jouer.png",
@@ -1291,6 +1337,7 @@ function lancerJouer() {
     let eclairRouge = new ImageFull(images.eclairRouge);
     let doEclairRouge = false;
     let currentSpawn = 0;
+    let spawnCount = 0;
     let nextSpawn = 100;
     let isPerdu = false;
 
@@ -1334,13 +1381,13 @@ function lancerJouer() {
         // Attackers
         currentSpawn += 1;
         if (currentSpawn == nextSpawn) {
-            let minLife = 20;
-            let maxLife = Math.round(5 + Math.pow(Game.frameNo, 1.2) / 250);
-            let tmpLife = rand(minLife, maxLife);
+            spawnCount++;
+            let minLife = 1;
+            let maxLife = Math.round(5 + Math.pow(Game.frameNo, 1.5) / 500);
+            let tmpLife = rand(minLife, maxLife); 
             let adjustementPercentage = (tmpLife - maxLife) / maxLife;
             currentSpawn = 0;
-            let nextSpawnFormula = Math.pow(Game.frameNo, 1.2) / 500;
-            nextSpawn += Math.round(nextSpawnFormula + nextSpawnFormula * adjustementPercentage);
+            nextSpawn = Math.max(Math.min(Math.round((100 + spawnCount * 25) * Math.abs(adjustementPercentage)), 400), 1);
             //console.log(`minLife=${minLife}, maxLife=${maxLife}, tmpLife=${tmpLife}, adjustementPercentage=${adjustementPercentage}, nextSpawnFormula=${nextSpawnFormula}, nextSpawn=${nextSpawn}`);
 
             let r = Math.round(Math.random());
@@ -1378,7 +1425,7 @@ function lancerJouer() {
                         attackers[i].decreaseLife(shoots[j].skill);
                         shoots.splice(j, 1);
                         if (attackers[i].ERROR_IN_LIFE) {
-                            def.decreaseLife(50);
+                            def.decreaseLife(1);
                             doEclairRouge = true;
                         }
                     }
@@ -1388,7 +1435,7 @@ function lancerJouer() {
 
         for (i = 0; i < attackers.length; i += 1) {
             if (attackers[i].crashWith(def) && attackers[i].dead == false) {
-                def.decreaseLife(attackers[i].life);
+                def.decreaseLife(1);
                 attackers[i].dieded();
                 doEclairRouge = true;
             }
@@ -1400,7 +1447,7 @@ function lancerJouer() {
 			}
 		}
 
-        if (def.life.currHP == 0 && !isPerdu) {
+        if (def.life.currHP <= 0 && !isPerdu) {
             isPerdu = true;
             changeState(LOST_STATE);
         }
