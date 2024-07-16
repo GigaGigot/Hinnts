@@ -4,7 +4,7 @@ let CANVAS_WIDTH = 1200;
 let CANVAS_HEIGHT = 800;
 let FONT = "Papyrus";
 let KEY_SKILL_1, KEY_SKILL_2, KEY_SKILL_3, KEY_SKILL_4;
-let LOADING_STATE = "LOADING_STATE", PLAY_STATE = "PLAY_STATE", LOST_STATE = "LOST_STATE", MENU_STATE = "MENU_STATE", OPTIONS_STATE = "OPTIONS_STATE";
+let LOADING_STATE = "LOADING_STATE", PLAY_STATE = "PLAY_STATE", LOST_STATE = "LOST_STATE", MENU_STATE = "MENU_STATE", OPTIONS_STATE = "OPTIONS_STATE", LORE_STATE = "LORE_STATE", HOWTOPLAY_STATE = "HOWTOPLAY_STATE";
 let DMG_RULE_FIXE = "FIXE", DMG_RULE_DIVIDE = "DIVIDE", DMG_RULE_SQUARE = "SQUARE";
 let SCORE_RULE_NONE = "NONE", SCORE_RULE_HP_LOSS = "HP_LOSS", SCORE_RULE_SQUARE = "SQUARE";
 
@@ -42,6 +42,37 @@ let Data = {
     keyboard: "AZERTY"
 }
 
+let LastGameSummary = {
+    killCount: 0,
+    highestDamageDealt: 0,
+    highestEnnemyHpDefeated: 0,
+    youCouldHaveList : [],
+    reset: function () {
+        this.killCount = 0;
+        this.highestDamageDealt = 0;
+        this.highestEnnemyHpDefeated = 0;
+        this.youCouldHaveList = [];
+    }
+}
+
+function YouCouldHaveStat(life, rule, divideValue) {
+    this.life = life;
+    this.rule = rule;
+    this.divideValue = divideValue;
+    this.done = false;
+    this.toClearString = function () {
+        if (this.rule == DMG_RULE_SQUARE) {
+            return `- Done the square root of ${this.life}`;
+        }
+        else if (this.rule == DMG_RULE_DIVIDE) {
+            return `- Divided ${this.life} by ${this.divideValue}`;
+        }
+        else {
+            return ""
+        }
+    }
+}
+
 let Game = {
     canvas: document.createElement("canvas"),
     start: function () {
@@ -54,7 +85,7 @@ let Game = {
 
         // init
         window.addEventListener('click', function(e) {
-            this.music = new Sound("./sound/soundtrackv4.wav", true);
+            this.music = new Sound("./sound/soundtrackv5.wav", true);
             this.music.play();
         }, {once: true});
 
@@ -193,8 +224,8 @@ function Skills() {
     this.skillsPos2 = 0,
     this.skills3 = [
         { code: "diviseParDix", image: images.diviseParDix, dmg: 10, dmgRule: DMG_RULE_DIVIDE, score: 10, scoreRule: SCORE_RULE_HP_LOSS },
-        { code: "diviseParCent", image: images.diviseParCent, dmg: 100, dmgRule: DMG_RULE_DIVIDE, score: 100, scoreRule: SCORE_RULE_HP_LOSS },
-        { code: "diviseParMille", image: images.diviseParMille, dmg: 1000, dmgRule: DMG_RULE_DIVIDE, score: 1000, scoreRule: SCORE_RULE_HP_LOSS }
+        { code: "diviseParCent", image: images.diviseParCent, dmg: 100, dmgRule: DMG_RULE_DIVIDE, score: 20, scoreRule: SCORE_RULE_HP_LOSS },
+        { code: "diviseParMille", image: images.diviseParMille, dmg: 1000, dmgRule: DMG_RULE_DIVIDE, score: 30, scoreRule: SCORE_RULE_HP_LOSS }
     ],
     this.skillsPos3 = 0,
     this.skills4 =  [
@@ -266,7 +297,7 @@ function Defender(width, height, sprite) {
     this.hitboxInnerMargin = 5; // Arbitrary value
     this.xCenter = this.x + (this.width / 2);
     this.yCenter = this.y + (this.height / 2);
-    this.life = new LifeBar(Game.canvas.width / 2 - 150, Game.canvas.height - 70, 100);
+    this.life = new LifeBar(Game.canvas.width / 2 - 97, Game.canvas.height - 110);
     this.sprite = new Sprite(this.x, this.y, width, height, sprite, 0);
     this.ombre = new Sprite(this.x - 18, this.y - 18, 100, 100, images.tour_ombre, 0);
     this.joueur = new Sprite(this.x - 18, this.y - 18, 100, 100, images.joueur, 0);
@@ -274,8 +305,12 @@ function Defender(width, height, sprite) {
     this.cptTooClose = 0;
     this.update = function () {
         // Regen
-        if (everyInterval(50) && this.life.currHP < this.life.maxHP) {
-            this.life.currHP++;
+        if (everyInterval(20) && this.life.currHP < this.life.maxHP) {
+            this.life.regeneratingHP++;
+            if (this.life.regeneratingHP >= 100) {
+                this.life.regeneratingHP = 0;
+                this.life.currHP++;
+            }
         }
 
         // Make the shadow spin indefinitely
@@ -308,6 +343,7 @@ function Defender(width, height, sprite) {
     }
     this.decreaseLife = function (dmg) {
         this.life.currHP -= dmg;
+        this.life.regeneratingHP = 0;
         if (this.life.currHP < 0) {
             this.life.currHP = 0;
         }
@@ -327,8 +363,9 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
     this.hitboxInnerMargin = 7; // Arbitrary value
     this.dead = false;
     this.ERROR_IN_LIFE = false;
+    this.maxLife = life;
     this.life = life;
-    this.lifeDsp = new Text("16px", FONT, "white", x + TextWidth(String(this.life)), y - 2, String(this.life));
+    this.lifeDsp = new Texte("16px", FONT, "white", x + TextWidth(String(this.life)), y - 2, String(this.life));
     this.sprite = new SpriteAnimated(x, y, width, height, image, image_reversed, flip, 8);
     this.update = function () {
 		if (this.dead == false) {
@@ -339,7 +376,6 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
     }
     this.newPos = function () {
         if (this.dead == true) {
-            console.log(this.speed);
             this.speed = Math.max(this.speed - 0.02, 0);
         }
         this.x += this.xSpeed * this.speed;
@@ -383,15 +419,30 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
             this.dieded();
         }
         else {
+            // stat
+            if (this.maxLife == oldLife) {
+                let youCouldHave = LastGameSummary.youCouldHaveList.find(e => e.life == this.maxLife);
+                if (youCouldHave != null) {
+                    if (youCouldHave.rule == skill.dmgRule && (youCouldHave.divideValue == null || youCouldHave.divideValue == skill.dmg)) {
+                        youCouldHave.done = true;
+                    }
+                }
+            }
+
             // Do score
             if (skill.scoreRule == SCORE_RULE_NONE) {
                 currentScore += skill.score;
             }
             else if (skill.scoreRule == SCORE_RULE_HP_LOSS) {
-                currentScore += (oldLife - newLife) * skill.score;
+                currentScore += Math.round(Math.log2(oldLife - newLife) * skill.score);
             }
             else if (skill.scoreRule == SCORE_RULE_SQUARE) {
-                currentScore += (oldLife - newLife) * newLife;
+                currentScore += Math.round(Math.log2(oldLife - newLife) * newLife);
+            }
+
+            let damageDealt = oldLife - newLife;
+            if (LastGameSummary.highestDamageDealt == undefined || LastGameSummary.highestDamageDealt < damageDealt) {
+                LastGameSummary.highestDamageDealt = damageDealt;
             }
 
             this.life = newLife;
@@ -399,6 +450,11 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
 
             if (newLife <= 0) {
                 this.dieded();
+                LastGameSummary.killCount++;
+
+                if (LastGameSummary.highestEnnemyHpDefeated == undefined || LastGameSummary.highestEnnemyHpDefeated < this.maxLife) {
+                    LastGameSummary.highestEnnemyHpDefeated = this.maxLife;
+                }
             }
         }
     }
@@ -709,19 +765,36 @@ function ImageFull(texture) {
     ImageBase.call(this, 0, 0, Game.canvas.width, Game.canvas.height, texture);
 }
 
-function Text(size, font, color, x, y, text) {
+function Texte(size, font, color, x, y, text) {
     this.size = size;
     this.font = font;
     this.x = x;
     this.y = y;
+    this.bold = false;
+    this.underline = false;
+    this.centered = false;
     if (text != null) {
         this.text = text;
     }
     this.update = function () {
         ctx = Game.context;
-        ctx.font = this.size + " " + this.font;
+        let boldDsp = "";
+        if (this.bold == true) {
+            boldDsp = "bold ";
+        }
+        ctx.font = boldDsp + this.size + " " + this.font;
         ctx.fillStyle = color;
-        ctx.fillText(this.text, this.x, this.y);
+        var textMeasurement = ctx.measureText(this.text);
+
+        var xOffset = 0;
+        if (this.centered) {
+            xOffset = -1 * (textMeasurement.width / 2);
+        }
+        ctx.fillText(this.text, this.x + xOffset, this.y);
+
+        if (this.underline == true) {
+            ctx.fillRect(this.x + xOffset, this.y + textMeasurement.hangingBaseline * 0.5, textMeasurement.width, 2);
+        }
     }
     this.newPos = function (x, y) {
         this.x = x;
@@ -729,21 +802,58 @@ function Text(size, font, color, x, y, text) {
     }
 };
 
-function LifeBar(x, y, maxHP) {
-    this.contour = new ImageSameDim(x - 3, y, images.contourVie);
-    this.fond = new ImageSameDim(x, y + 3, images.fondVie);
-    this.vie = new ImageSameDim(x, y + 3, images.vie);
-    this.dspVie = new Text("14px", FONT, "white", x + 135, y + 13, String(this.vie));
-    this.maxHP = maxHP;
-    this.currHP = maxHP;
+function LifeBar(x, y) {
+    this.contour1 = new ImageSameDim(x, y, images.heartLifeBorder);
+    this.fond1 = new ImageSameDim(x, y, images.heartLifeEmpty);
+    this.vie1 = new ImageSameDim(x, y, images.heartLifeFull);
+
+    this.contour2 = new ImageSameDim(x + 64, y, images.heartLifeBorder);
+    this.fond2 = new ImageSameDim(x + 64, y, images.heartLifeEmpty);
+    this.vie2 = new ImageSameDim(x + 64, y, images.heartLifeFull);
+    this.regen2 = new ImageSameDim(x + 64, y, images.heartLifeRegenerating);
+
+    this.contour3 = new ImageSameDim(x + 128, y, images.heartLifeBorder);
+    this.fond3 = new ImageSameDim(x + 128, y, images.heartLifeEmpty);
+    this.vie3 = new ImageSameDim(x + 128, y, images.heartLifeFull);
+    this.regen3 = new ImageSameDim(x + 128, y, images.heartLifeRegenerating);
+
+    this.maxHP = 3;
+    this.currHP = this.maxHP;
+    this.regeneratingHP = 0;
     this.update = function () {
-        this.contour.update();
-        this.fond.update();
-        this.vie.width = (this.currHP * this.fond.width) / 100;
-        this.vie.update();
-        this.dspVie.text = this.currHP;
-        this.dspVie.x = this.fond.x + (this.fond.width / 2) - (TextWidth(this.dspVie.text) / 2);
-        this.dspVie.update();
+        this.fond1.update();
+        if (this.currHP > 0) {
+            this.vie1.update();
+        }
+        this.contour1.update();
+
+        this.vie2.update();
+        if (this.currHP == 1) {
+            this.regen2.update();
+            this.fond2.height = (this.vie2.height - 22) * (Math.abs((this.regeneratingHP - 100) / 100)) + 11;
+            this.fond2.update();
+        }
+        else if (this.currHP < 1) {
+            if (this.fond2.height != this.vie2.height) {
+                this.fond2.height = this.vie2.height;
+            }
+            this.fond2.update();
+        }
+        this.contour2.update();
+
+        this.vie3.update();
+        if (this.currHP == 2) {
+            this.regen3.update();
+            this.fond3.height = (this.vie3.height - 22) * (Math.abs((this.regeneratingHP - 100) / 100)) + 11;
+            this.fond3.update();
+        }
+        else if (this.currHP < 2) {
+            if (this.fond3.height != this.vie3.height) {
+                this.fond3.height = this.vie3.height;
+            }
+            this.fond3.update();
+        }
+        this.contour3.update();
     }
 };
 
@@ -756,9 +866,9 @@ function BarSlider(x, y, width, height) {
     this.max = 10;
     this.bar = new ImageSameDim(x, y, images.barslide);
     this.bitogno = new ImageSameDim(x + width / 2 - 8, y-4, images.barslide_bitogno);
-    this.dspMin = new Text("14px", FONT, "white", x-20, y + 12, String(this.min));
-    this.dspMax = new Text("14px", FONT, "white", x + width + 10, y + 12, String(this.max));
-    this.dspCurrent = new Text("14px", FONT, "white", x, y - 6, null);
+    this.dspMin = new Texte("14px", FONT, "white", x-20, y + 12, String(this.min));
+    this.dspMax = new Texte("14px", FONT, "white", x + width + 10, y + 12, String(this.max));
+    this.dspCurrent = new Texte("14px", FONT, "white", x, y - 6, null);
 	this.bitognoClicked = false;
     this.update = function () {
 		this.onFocus();
@@ -856,7 +966,7 @@ function Sound(src, looping) {
 /* Fonctions boucle */
 function lancerChargement() {
     let bg = new ImageFull(images.mainBg);
-    let currentLoadedImagesText = new Text("24px", FONT, "white", Game.canvas.width / 2, Game.canvas.height / 2, `Loading resources...`);
+    let currentLoadedImagesText = new Texte("24px", FONT, "white", Game.canvas.width / 2, Game.canvas.height / 2, `Loading resources...`);
     let cptResources = 0;
     let currentResourceLoaded = 0;
 
@@ -897,6 +1007,10 @@ function lancerChargement() {
             contourVie: "./img/contourVie.png",
             fondVie: "./img/fondVie.png",
             vie: "./img/vie.png",
+            heartLifeBorder: "./img/heartLifeBorder.png",
+            heartLifeEmpty: "./img/heartLifeEmpty.png",
+            heartLifeFull: "./img/heartLifeFull.png",
+            heartLifeRegenerating: "./img/heartLifeRegenerating.png",
             barslide: "./img/barslide.png",
             barslide_bitogno: "./img/barslide_bitogno.png",
             jouer: "./img/jouer.png",
@@ -933,7 +1047,8 @@ function lancerChargement() {
             fleche_gauche_focus : "./img/fleche_gauche_focus.png",
             fleche_droite : "./img/fleche_droite.png",
             fleche_droite_clic : "./img/fleche_droite_clic.png",
-            fleche_droite_focus : "./img/fleche_droite_focus.png",
+            fleche_droite_focus: "./img/fleche_droite_focus.png",
+            skills_details: "./img/skills_details.png",
         };
         for (let src in sources) {
             cptResources++;
@@ -967,7 +1082,7 @@ function lancerMenu() {
     let bg = new ImageFull(images.mainBg);
     let fadingBg = new ImageFull(images.mainBg);
     let fadingOpacity = 1;
-    if (previousState == OPTIONS_STATE) {
+    if (previousState == OPTIONS_STATE || previousState == LORE_STATE || previousState == HOWTOPLAY_STATE) {
         fadingOpacity = 0; // Cancel the animation
     }
 
@@ -982,6 +1097,12 @@ function lancerMenu() {
         }
         if (btnOptions.isClicked()) {
             changeState(OPTIONS_STATE);
+        }
+        if (btnLore.isClicked()) {
+            changeState(LORE_STATE);
+        }
+        if (btnHowToPlay.isClicked()) {
+            changeState(HOWTOPLAY_STATE);
         }
 
         bg.update();
@@ -1020,16 +1141,16 @@ function lancerOptions() {
     let baseX = 460;
     let baseY = 420;
 
-    let volumeDsp = new Text("16px", FONT, "white", baseX, baseY, `Volume :`);
+    let volumeDsp = new Texte("16px", FONT, "white", baseX, baseY, `Volume :`);
     let barslider = new BarSlider(baseX + 140, baseY - 12, 100, 16);
     barslider.setValeur(Data.volume * 10);
 
-    let keyboardDsp = new Text("16px", FONT, "white", baseX, baseY + 50, `Keyboard :`);
+    let keyboardDsp = new Texte("16px", FONT, "white", baseX, baseY + 50, `Keyboard :`);
     let btnFlecheGauche = new Button(baseX + 100, baseY + 30, images3States.fleche_gauche, null);
     let btnFlecheDroite = new Button(baseX + 260, baseY + 30, images3States.fleche_droite, null);
     let keyboards = ["AZERTY", "QWERTY"];
     let currentKeyboardsIndex = keyboards.indexOf(Data.keyboard);
-    let currentKeyboardDsp = new Text("16px", FONT, "white", baseX + 194, baseY + 50, String(`${keyboards[currentKeyboardsIndex]}`));
+    let currentKeyboardDsp = new Texte("16px", FONT, "white", baseX + 194, baseY + 50, String(`${keyboards[currentKeyboardsIndex]}`));
     currentKeyboardDsp.x = baseX + 194 - (TextWidth(currentKeyboardDsp.text) / 2);
 
     Game.interval = setInterval(update, 20);
@@ -1092,19 +1213,131 @@ function lancerOptions() {
     };
 };
 
+function lancerLore() {
+    let bg = new ImageFull(images.mainBg);
+    let btnRetour = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2 + 200, images3States.boutonFond, images.retour);
+
+    let loreTextMargin = 50;
+    let loreText = `Back in 2015, during high school, a friend and I came up with the idea of creating a mental arithmetic game. I initially put together a Proof of Concept but soon lost interest and forgot about it. Years later, I stumbled upon the project in my folders and decided to dust it off, making improvements here and there. After several years of on-and-off tinkering, I finally revamped it enough to release the final version. 'Hinnts' is a reference to 'int' in programming, reflecting the core gameplay mechanics of this game. I know what some people might say, but NO, the Papyrus font STAYS ON; it was cool back then. Anyway, enjoy this little game!`;
+
+    Game.interval = setInterval(update, 20);
+
+    function update() {
+        // Game
+        Game.update();
+
+        if (btnRetour.isClicked()) {
+            changeState(MENU_STATE);
+        }
+
+        bg.update();
+        UpdateEclair();
+
+        pluie1.update();
+        pluie2.update();
+		nuage1.update();
+		nuage2.update();
+
+        btnRetour.update();
+      
+        PrintWrappingText(loreText, 38, loreTextMargin, 100, CANVAS_WIDTH - loreTextMargin * 2, true);
+
+		brume1.update();
+		brume2.update();
+
+		Cursor.update();
+    };
+};
+
+function lancerHowToPlay() {
+    let bg = new ImageFull(images.mainBg);
+    let btnRetour = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2 + 200, images3States.boutonFond, images.retour);
+
+    let baseX = 50;
+    let baseY = 120;
+    let maxWidth = 650;
+
+    let title1 = new Texte("38px", FONT, "white", baseX + 650 / 2 - 140, baseY - 40, "Essential Info");
+    title1.bold = true;
+    title1.underline = true;
+    let info1 = "- Press and release skills key to fire their corresponding arithmetic calculation";
+    let info2 = "- Hold and scroll up/down to modify a skill key multiplier (when available)";
+    let info3 = "- Reduce the enemies' HP to 0 to defeat them properly";
+    let info4 = "- Damaging an enemy to a decimal HP makes them explode and causes you to lose a lot of HP. Be careful!";
+    let skillsDetails = new ImageSameDim(Game.canvas.width - images.skills_details.width - 50, 100, images.skills_details);
+    let keysText = "";
+    let spacing = "        ";
+    switch (Data.keyboard) {
+        case "AZERTY":
+            keysText = `A${spacing}Z${spacing}E${spacing}R`;
+            break;
+        case "QWERTY":
+            spacing = spacing.substring(1); // bigger letters
+            keysText = `Q${spacing}W${spacing}E${spacing} R`;
+            break;
+    }
+    let keysTextDsp = new Texte("28px", FONT, "white", skillsDetails.x + 40, skillsDetails.y + skillsDetails.height + 16, keysText);
+    let title2 = new Texte("38px", FONT, "white", baseX, baseY + 370, "Other tips");
+    title2.bold = true;
+    title2.underline = true;
+    let info5 = "- Cancel an held skill by moving the pointer to the center and releasing the key";
+    let info6 = "- The higher the amount of damage dealt to an ennemy, the higher the score you'll obtain!";
+    let info7 = "- The more complex the arithmetic operation you use, the higher the score you'll obtain!";
+
+    Game.interval = setInterval(update, 20);
+
+    function update() {
+        // Game
+        Game.update();
+
+        if (btnRetour.isClicked()) {
+            changeState(MENU_STATE);
+        }
+
+        bg.update();
+        UpdateEclair();
+
+        pluie1.update();
+        pluie2.update();
+		nuage1.update();
+		nuage2.update();
+
+        btnRetour.update();
+
+        title1.update();
+        PrintWrappingText(info1, 24, baseX, baseY + 20, maxWidth, false);
+        PrintWrappingText(info2, 24, baseX, baseY + 90, maxWidth, false);
+        PrintWrappingText(info3, 24, baseX, baseY + 160, maxWidth, false);
+        PrintWrappingText(info4, 24, baseX, baseY + 200, maxWidth, false);
+        skillsDetails.update();
+        keysTextDsp.update();
+        title2.update();
+        PrintWrappingText(info5, 24, baseX + 220, baseY + 320, maxWidth + 250, false);
+        PrintWrappingText(info6, 24, baseX + 220, baseY + 370, maxWidth + 250, false);
+        PrintWrappingText(info7, 24, baseX + 220, baseY + 420, maxWidth + 250, false);
+
+		brume1.update();
+		brume2.update();
+
+		Cursor.update();
+    };
+};
+
 function lancerJouer() {
     currentScore = 0;
-    let currentScoreDsp = new Text("16px", FONT, "white", 10, 20, `Score : ${String(currentScore)}`);
+    LastGameSummary.reset();
+    let currentScoreDsp = new Texte("16px", FONT, "white", 10, 20, `Score : ${String(currentScore)}`);
     let shoots = [];
     let attackers = [];
     let def = new Defender(64, 64, images.tour);
-    let text = new Text("16px", FONT, "white", 10, 30, null);
+    let text = new Texte("16px", FONT, "white", 10, 30, null);
     let skills = new Skills();
     let interfaceSkills = new InterfaceSkills(skills);
     let bg = new ImageFull(images.mainBg);
     let eclairRouge = new ImageFull(images.eclairRouge);
     let doEclairRouge = false;
     let currentSpawn = 0;
+    let spawnCount = 0;
     let nextSpawn = 100;
     let isPerdu = false;
 
@@ -1148,13 +1381,13 @@ function lancerJouer() {
         // Attackers
         currentSpawn += 1;
         if (currentSpawn == nextSpawn) {
+            spawnCount++;
             let minLife = 1;
-            let maxLife = Math.round(5 + Math.pow(Game.frameNo, 1.2) / 250);
-            let tmpLife = rand(minLife, maxLife);
+            let maxLife = Math.round(5 + Math.pow(Game.frameNo, 1.5) / 500);
+            let tmpLife = rand(minLife, maxLife); 
             let adjustementPercentage = (tmpLife - maxLife) / maxLife;
             currentSpawn = 0;
-            let nextSpawnFormula = Math.pow(Game.frameNo, 1.2) / 500;
-            nextSpawn += Math.round(nextSpawnFormula + nextSpawnFormula * adjustementPercentage);
+            nextSpawn = Math.max(Math.min(Math.round((100 + spawnCount * 25) * Math.abs(adjustementPercentage)), 400), 1);
             //console.log(`minLife=${minLife}, maxLife=${maxLife}, tmpLife=${tmpLife}, adjustementPercentage=${adjustementPercentage}, nextSpawnFormula=${nextSpawnFormula}, nextSpawn=${nextSpawn}`);
 
             let r = Math.round(Math.random());
@@ -1163,6 +1396,23 @@ function lancerJouer() {
             let dx = (def.xCenter - xRand);
             let dy = (def.yCenter - yRand);
             let mag = Math.sqrt(dx * dx + dy * dy);
+
+            if (tmpLife > 20) {
+                if (!LastGameSummary.youCouldHaveList.some(e => e.tmpLife === tmpLife)) {
+                    if (Math.sqrt(tmpLife) % 1 === 0) {
+                        LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_SQUARE, null));
+                    }
+                    else if ((tmpLife / 11) % 1 === 0) {
+                        LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_DIVIDE, 11));
+                    }
+                    else if ((tmpLife / 7) % 1 === 0) {
+                        LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_DIVIDE, 7));
+                    }
+                    else if ((tmpLife / 3) % 1 === 0) {
+                        LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_DIVIDE, 3));
+                    }
+                }
+            }
 
             attackers.push(new Attacker(48, 48, images.sprite_mob, images.sprite_mob_reversed, xRand, yRand, (dx / mag), (dy / mag), r, tmpLife));
         }
@@ -1175,7 +1425,7 @@ function lancerJouer() {
                         attackers[i].decreaseLife(shoots[j].skill);
                         shoots.splice(j, 1);
                         if (attackers[i].ERROR_IN_LIFE) {
-                            def.decreaseLife(50);
+                            def.decreaseLife(1);
                             doEclairRouge = true;
                         }
                     }
@@ -1185,7 +1435,7 @@ function lancerJouer() {
 
         for (i = 0; i < attackers.length; i += 1) {
             if (attackers[i].crashWith(def) && attackers[i].dead == false) {
-                def.decreaseLife(attackers[i].life);
+                def.decreaseLife(1);
                 attackers[i].dieded();
                 doEclairRouge = true;
             }
@@ -1197,7 +1447,7 @@ function lancerJouer() {
 			}
 		}
 
-        if (def.life.currHP == 0 && !isPerdu) {
+        if (def.life.currHP <= 0 && !isPerdu) {
             isPerdu = true;
             changeState(LOST_STATE);
         }
@@ -1266,16 +1516,18 @@ function IsTooClose(x1, y1, x2, y2) {
 function lancerPerdu() {
     let bg = new ImageFull(images.mainBg);
     let eclairRouge = new ImageFull(images.eclairRouge);
-    let btnRejouer = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2, images3States.boutonFond, images.rejouer);
-    let btnMenu = new Button(Game.canvas.width / 2 - 128, Game.canvas.height / 2 + 100, images3States.boutonFond, images.menu);
+    let btnRejouer = new Button(Game.canvas.width / 2 - 128 - 150, Game.canvas.height / 2 + 300, images3States.boutonFond, images.rejouer);
+    let btnMenu = new Button(Game.canvas.width / 2 - 128 + 150, Game.canvas.height / 2 + 300, images3States.boutonFond, images.menu);
     let diededTitre = new ImageSameDim(Game.canvas.width / 2 - images.dieded.width / 2, 0, images.dieded);
 
-    let baseX = 520;
-    let baseY = 270;
+    let baseX = 50;
+    let baseY = 380;
 
-    let finalScoreDsp = new Text("24px", FONT, "white", baseX, baseY, `Final score : ${(currentScore == undefined ? 'none' : String(currentScore))}`);
+    let finalScoreTexteDsp = new Texte("42px", FONT, "white", baseX + 50, baseY, `Final score`);
+    let finalScoreDsp = new Texte("120px", FONT, "white", baseX + 150, baseY + 100, `${(currentScore == undefined ? 'none' : String(currentScore))}`);
+    finalScoreDsp.centered = true;
     let previousHighscore = Data.highestScore;
-    let previousHighscoreDsp = new Text("24px", FONT, "white", baseX, baseY + 100, `(previous : ${(previousHighscore == undefined ? 'none' : previousHighscore)})`);
+    let previousHighscoreDsp = new Texte("24px", FONT, "white", baseX + 50, baseY + 200, `(previous : ${(previousHighscore == undefined ? 'none' : previousHighscore)})`);
 
     let isNewHighscore = false;
     if (currentScore != undefined) {
@@ -1286,14 +1538,45 @@ function lancerPerdu() {
         }
     }
 
-    let highscoreDsp = new Text("24px", FONT, "white", baseX, baseY + 50, `Highscore : ${(Data.highestScore == undefined ? 'none' : String(Data.highestScore))}`);
-    let new1 = new ImageSameDim(baseX + 160, baseY + 25, images.new1);
-    let new2 = new ImageSameDim(baseX + 160, baseY + 25, images.new2);
+    let highscoreDsp = new Texte("24px", FONT, "white", baseX + 50, baseY + 160, `Highscore : ${(Data.highestScore == undefined ? 'none' : String(Data.highestScore))}`);
+    let new1 = new ImageSameDim(baseX + 230, baseY + 135, images.new1);
+    let new2 = new ImageSameDim(baseX + 230, baseY + 135, images.new2);
+
+
+    let killCountDsp = new Texte("26px", FONT, "white", baseX + 450, baseY - 80, "Gracefully killed ennemy count : ");
+    let killCountVal = new Texte("26px", FONT, "white", baseX + 820, baseY - 80, `${(LastGameSummary.killCount == undefined ? 0 : LastGameSummary.killCount)}`);
+
+    let highestDamageDealtDsp = new Texte("26px", FONT, "white", baseX + 450, baseY - 40, "Highest damage dealt : ");
+    let highestDamageDealtVal = new Texte("26px", FONT, "white", baseX + 820, baseY - 40, `${(LastGameSummary.highestDamageDealt == undefined ? 0 : LastGameSummary.highestDamageDealt)}`);
+
+    let highestEnnemyHpDefeatedDsp = new Texte("26px", FONT, "white", baseX + 450, baseY, "Highest HP ennemy defeated : ");
+    let highestEnnemyHpDefeatedVal = new Texte("26px", FONT, "white", baseX + 820, baseY, `${(LastGameSummary.highestEnnemyHpDefeated == undefined ? 0 : LastGameSummary.highestEnnemyHpDefeated)}`);
+
+    let atLeastOneYouCouldHave = false;
+    let youCouldHaveDsp = new Texte("26px", FONT, "white", baseX + 450, baseY + 80, "You could have...");
+    let youCouldHaveDsp1 = new Texte("26px", FONT, "white", baseX + 480, baseY + 120, "");
+    let youCouldHaveDsp2 = new Texte("26px", FONT, "white", baseX + 480, baseY + 160, "");
+    let youCouldHaveDsp3 = new Texte("26px", FONT, "white", baseX + 480, baseY + 200, "");
+    let youCouldHaveListFiltered = LastGameSummary.youCouldHaveList.filter(e => !e.done).sort(e => e.tmpLife * -1);
+    if (youCouldHaveListFiltered.length > 0) {
+        atLeastOneYouCouldHave = true;
+        if (youCouldHaveListFiltered.length == 1) {
+            youCouldHaveDsp1.text = youCouldHaveListFiltered[0].toClearString();
+        }
+        else if (youCouldHaveListFiltered.length == 2) {
+            youCouldHaveDsp1.text = youCouldHaveListFiltered[1].toClearString();
+            youCouldHaveDsp2.text = youCouldHaveListFiltered[0].toClearString();
+        }
+        else {
+            youCouldHaveDsp1.text = youCouldHaveListFiltered[2].toClearString();
+            youCouldHaveDsp2.text = youCouldHaveListFiltered[1].toClearString();
+            youCouldHaveDsp3.text = youCouldHaveListFiltered[0].toClearString();
+        }
+    }
 
     Game.interval = setInterval(update, 40);
 
     function update() {
-        // Game
         Game.update();
 
         if (btnRejouer.isClicked()) {
@@ -1317,6 +1600,7 @@ function lancerPerdu() {
         btnRejouer.update();
         btnMenu.update();
 
+        finalScoreTexteDsp.update();
         finalScoreDsp.update();
         highscoreDsp.update();
 
@@ -1332,6 +1616,22 @@ function lancerPerdu() {
             else {
                 new2.time = 40;
             }
+        }
+
+        highestDamageDealtDsp.update();
+        highestDamageDealtVal.update();
+
+        killCountDsp.update();
+        killCountVal.update();
+
+        highestEnnemyHpDefeatedDsp.update();
+        highestEnnemyHpDefeatedVal.update();
+
+        if (atLeastOneYouCouldHave) {
+            youCouldHaveDsp.update();
+            youCouldHaveDsp1.update();
+            youCouldHaveDsp2.update();
+            youCouldHaveDsp3.update();
         }
 
 		brume1.update();
@@ -1445,6 +1745,12 @@ function changeState(newState) {
     else if (newState == OPTIONS_STATE) {
         lancerOptions();
     }
+    else if (newState == LORE_STATE) {
+        lancerLore();
+    }
+    else if (newState == HOWTOPLAY_STATE) {
+        lancerHowToPlay();
+    }
 };
 
 function outOfCanvas(object, canvas) {
@@ -1476,6 +1782,51 @@ async function NewImage(url) {
 function TextWidth(txt) {
     return Game.context.measureText(txt).width;
 }
+
+function PrintWrappingText(text, fontSize, x, y, fitWidth, center) {
+    Game.context.save();
+    Game.context.font = `${fontSize}px ${FONT}`;
+    fitWidth = fitWidth || 0;
+
+    if (fitWidth <= 0) {
+        Game.context.fillText(text, x, y);
+        return;
+    }
+    var words = text.split(' ');
+    var currentLine = 0;
+    var idx = 1;
+    while (words.length > 0 && idx <= words.length) {
+        var str = words.slice(0, idx).join(' ');
+        var w = Game.context.measureText(str).width;
+        if (w > fitWidth) {
+            if (idx == 1) {
+                idx = 2;
+            }
+            var textToRender = words.slice(0, idx - 1).join(' ');
+            var textOffset = 0;
+            if (center) {
+                var textWidth = Game.context.measureText(textToRender).width;
+                textOffset = (fitWidth - textWidth) / 2;
+            }
+            Game.context.fillText(textToRender, x + textOffset, y + (fontSize * 1.3 * currentLine));
+            currentLine++;
+            words = words.splice(idx - 1);
+            idx = 1;
+        }
+        else { idx++; }
+    }
+    if (idx > 0) {
+        var textToRender = words.join(' ');
+        var textOffset = 0;
+        if (center) {
+            var textWidth = Game.context.measureText(textToRender).width;
+            textOffset = (fitWidth - textWidth) / 2;
+        }
+        Game.context.fillText(textToRender, x + textOffset, y + (fontSize * 1.3 * currentLine));
+    }
+    Game.context.restore();
+}
+
 ///////////////////////
 
 
@@ -1484,7 +1835,7 @@ function setCookie(cname, cvalue, exdays) {
     let d = new Date();
     d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
     let expires = "expires=" + d.toUTCString();
-    document.cookie = cname + "=" + cvalue + "; " + expires;
+    document.cookie = cname + "=" + cvalue + "; " + expires + "; SameSite=Strict";
 };
 
 function getCookie(name) {
