@@ -24,7 +24,15 @@ async function startGame() {
     images.mainBg = await NewImage("./img/mainBg.png");
 
     // Cookies
-	checkCookie(MAIN_COOKIE);
+    if (!checkCookie(MAIN_COOKIE)) {
+        // Initialize default keyboard        
+        if (navigator != null && navigator.language.match(/fr/)) {
+            Data.keyboard = "AZERTY";
+        }
+        else {
+            Data.keyboard = "QWERTY";
+        }
+    }
     saveCookie();
 
     // Set up the game
@@ -470,7 +478,7 @@ function Shoot(x, y, width, height, xSpeed, ySpeed, skill, angle) {
     this.y = y - height / 2;
     this.width = width;
     this.height = height;
-    this.speed = 5;
+    this.speed = 10;
     this.xSpeed = xSpeed;
     this.ySpeed = ySpeed;
     this.skill = skill;
@@ -1783,6 +1791,10 @@ function TextWidth(txt) {
     return Game.context.measureText(txt).width;
 }
 
+function isEmpty(obj) {
+    return Object.keys(obj).length === 0;
+}
+
 function PrintWrappingText(text, fontSize, x, y, fitWidth, center) {
     Game.context.save();
     Game.context.font = `${fontSize}px ${FONT}`;
@@ -1835,6 +1847,7 @@ function setCookie(cname, cvalue, exdays) {
     let d = new Date();
     d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
     let expires = "expires=" + d.toUTCString();
+    //let expires = "expires=-99999"; // Test suppression
     document.cookie = cname + "=" + cvalue + "; " + expires + "; SameSite=Strict";
 };
 
@@ -1851,7 +1864,7 @@ function getCookie(name) {
 
 function checkCookie(name) {
     let save = getCookie(name);
-    if ((save || {}) != {}) {
+    if (!isEmpty(save)) {
         load(save);
         return true;
     } else {
