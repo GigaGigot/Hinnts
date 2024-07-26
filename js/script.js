@@ -5,8 +5,8 @@ let CANVAS_HEIGHT = 800;
 let FONT = "Papyrus";
 let KEY_SKILL_1, KEY_SKILL_2, KEY_SKILL_3, KEY_SKILL_4;
 let LOADING_STATE = "LOADING_STATE", PLAY_STATE = "PLAY_STATE", LOST_STATE = "LOST_STATE", MENU_STATE = "MENU_STATE", OPTIONS_STATE = "OPTIONS_STATE", LORE_STATE = "LORE_STATE", HOWTOPLAY_STATE = "HOWTOPLAY_STATE";
-let DMG_RULE_FIXE = "FIXE", DMG_RULE_DIVIDE = "DIVIDE", DMG_RULE_SQUARE = "SQUARE";
-let SCORE_RULE_NONE = "NONE", SCORE_RULE_HP_LOSS = "HP_LOSS", SCORE_RULE_SQUARE = "SQUARE";
+let DMG_RULE_FIXE = "FIXE", DMG_RULE_DIVIDE = "DIVIDE", DMG_RULE_SQUARE = "SQUARE", DMG_RULE_PRIME = "PRIME";
+let SCORE_RULE_NONE = "NONE", SCORE_RULE_HP_LOSS = "HP_LOSS", SCORE_RULE_SQUARE = "SQUARE", SCORE_RULE_PRIME = "PRIME";
 
 // Common content
 let images = {};
@@ -71,6 +71,9 @@ function YouCouldHaveStat(life, rule, divideValue) {
     this.toClearString = function () {
         if (this.rule == DMG_RULE_SQUARE) {
             return `- Done the square root of ${this.life}`;
+        }
+        else if (this.rule == DMG_RULE_PRIME) {
+            return `- Primed ${this.life}`;
         }
         else if (this.rule == DMG_RULE_DIVIDE) {
             return `- Divided ${this.life} by ${this.divideValue}`;
@@ -237,7 +240,8 @@ function Skills() {
     ],
     this.skillsPos3 = 0,
     this.skills4 =  [
-        { code: "racineCarree", image: images.racineCarree, dmg: 0, dmgRule: DMG_RULE_SQUARE, score: 0, scoreRule: SCORE_RULE_SQUARE }
+        { code: "racineCarree", image: images.racineCarree, dmg: 0, dmgRule: DMG_RULE_SQUARE, score: 0, scoreRule: SCORE_RULE_SQUARE },
+        { code: "prime", image: images.prime, dmg: 0, dmgRule: DMG_RULE_PRIME, score: 0, scoreRule: SCORE_RULE_PRIME }
     ],
     this.skillsPos4 = 0,
     this.update = function () {
@@ -410,6 +414,7 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
     this.decreaseLife = function (skill) {
         let oldLife = this.life;
         let newLife = this.life;
+        let erreurCalcul = false;
 
         // Do damages
         if (skill.dmgRule == DMG_RULE_FIXE) {
@@ -421,8 +426,16 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
         else if (skill.dmgRule == DMG_RULE_SQUARE) {
             newLife = Math.sqrt(oldLife);
         }
+        else if (skill.dmgRule == DMG_RULE_PRIME) {
+            if (isPrime(oldLife)) {
+                newLife = 0;
+            }
+            else {
+                erreurCalcul = true;
+            }
+        }
 
-        if (newLife % 1 !== 0) {
+        if (newLife % 1 !== 0 || erreurCalcul) {
             this.ERROR_IN_LIFE = true;
             this.dieded();
         }
@@ -446,6 +459,9 @@ function Attacker(width, height, image, image_reversed, x, y, xSpeed, ySpeed, fl
             }
             else if (skill.scoreRule == SCORE_RULE_SQUARE) {
                 currentScore += Math.round(Math.log2(oldLife - newLife) * newLife);
+            }
+            else if (skill.scoreRule == SCORE_RULE_PRIME) {
+                currentScore += Math.round(Math.log2(oldLife - newLife) * Math.max(Math.sqrt(oldLife)*1.5,2));
             }
 
             let damageDealt = oldLife - newLife;
@@ -1049,7 +1065,8 @@ function lancerChargement() {
             diviseParDix : "./img/diviseParDix.png",
             diviseParCent : "./img/diviseParCent.png",
             diviseParMille : "./img/diviseParMille.png",
-            racineCarree : "./img/racineCarree.png",
+            racineCarree: "./img/racineCarree.png",
+            prime: "./img/prime.png",
             fleche_gauche : "./img/fleche_gauche.png",
             fleche_gauche_clic : "./img/fleche_gauche_clic.png",
             fleche_gauche_focus : "./img/fleche_gauche_focus.png",
@@ -1409,6 +1426,9 @@ function lancerJouer() {
                 if (!LastGameSummary.youCouldHaveList.some(e => e.tmpLife === tmpLife)) {
                     if (Math.sqrt(tmpLife) % 1 === 0) {
                         LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_SQUARE, null));
+                    }
+                    else if (isPrime(tmpLife)) {
+                        LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_PRIME, null));
                     }
                     else if ((tmpLife / 11) % 1 === 0) {
                         LastGameSummary.youCouldHaveList.push(new YouCouldHaveStat(tmpLife, DMG_RULE_DIVIDE, 11));
@@ -1793,6 +1813,16 @@ function TextWidth(txt) {
 
 function isEmpty(obj) {
     return Object.keys(obj).length === 0;
+}
+
+function isPrime(num) {
+    if (num <= 1) return false;
+    if (num % 2 == 0 && num > 2) return false;
+    const s = Math.sqrt(num);
+    for (let i = 3; i <= s; i += 2) {
+        if (num % i === 0) return false;
+    }
+    return true;
 }
 
 function PrintWrappingText(text, fontSize, x, y, fitWidth, center) {
